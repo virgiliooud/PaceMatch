@@ -1,0 +1,7 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  background: #0f111a; /* mesma cor do container */
+  font-family: 'Inter', sans-serif;
+}

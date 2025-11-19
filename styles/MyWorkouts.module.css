@@ -1,0 +1,88 @@
+.container {
+  background: #0f111a;
+  color: #fff;
+  min-height: 100vh;
+  padding: 40px 20px;
+  font-family: 'Inter', sans-serif;
+}
+
+.backLink {
+  display: inline-block;
+  margin-bottom: 30px;
+  color: white;
+  text-decoration: underline;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.backLink:hover {
+  opacity: 0.8;
+}
+
+.title {
+  font-size: 26px;
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+.card {
+  background: #1c1f2a;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  margin-bottom: 20px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0,198,255,0.5);
+}
+
+.card h3 {
+  font-size: 20px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.card p {
+  opacity: 0.7;
+  margin: 2px 0;
+}
+
+.card .participants {
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+/* Mensagem de login */
+.loginMessage {
+  background: #000;
+  color: white;
+  height: 100vh;
+  padding: 40px;
+  font-size: 20px;
+}
+
+.loginLink {
+  color: white;
+  text-decoration: underline;
+  margin-top: 10px;
+  display: inline-block;
+  transition: opacity 0.2s;
+}
+
+.loginLink:hover {
+  opacity: 0.8;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .container {
+    padding: 20px 15px;
+  }
+  .title {
+    font-size: 22px;
+  }
+}
