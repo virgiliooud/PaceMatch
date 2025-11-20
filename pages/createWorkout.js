@@ -11,14 +11,14 @@ const MapCreator = dynamic(() => import("../components/MapCreator"), { ssr: fals
 const cidades = [
   "São Paulo",
   "Rio de Janeiro",
+  "Florianópolis e região",
   "Belo Horizonte",
   "Curitiba",
   "Porto Alegre",
   "Brasília",
   "Recife",
   "Fortaleza",
-  "Salvador",
-  "Manaus"
+  "Salvador"
   // Adicione mais cidades conforme sua necessidade
 ];
 
