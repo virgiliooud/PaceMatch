@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { db, auth } from "../firebase";
 import { collection, onSnapshot, doc, deleteDoc } from "firebase/firestore";
 import styles from "../styles/HomePage.module.css";
+import styles from "../styles/HomePage.module.css";
 import { useRouter } from "next/router";
 
 export default function MyWorkouts() {
