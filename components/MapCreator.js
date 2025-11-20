@@ -1,17 +1,7 @@
-import { MapContainer, TileLayer, Marker, Polyline, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline, useMapEvents } from "react-leaflet";
 import { useState } from "react";
 import axios from "axios";
 import "leaflet/dist/leaflet.css";
-
-let markerIcon = null;
-if (typeof window !== "undefined") {
-  const L = require("leaflet");
-  markerIcon = new L.Icon({
-    iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-  });
-}
 
 export default function MapCreator({ onRouteChange }) {
   const [waypoints, setWaypoints] = useState([]);
@@ -43,7 +33,13 @@ export default function MapCreator({ onRouteChange }) {
       setRouteGeoJSON(res.data);
       const dist_km = res.data.features[0].properties.summary.distance / 1000;
       setDistance(dist_km);
-      if (onRouteChange) onRouteChange(points, dist_km);
+
+      // Transformar coordenadas GeoJSON (lng, lat) em array {lat, lng} para o callback
+      const detailedRoute = res.data.features[0].geometry.coordinates.map(
+        ([lng, lat]) => ({ lat, lng })
+      );
+
+      if (onRouteChange) onRouteChange(detailedRoute, dist_km);
     } catch (err) {
       setRouteGeoJSON(null);
       setDistance(0);
@@ -79,9 +75,7 @@ export default function MapCreator({ onRouteChange }) {
           attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
         />
         <ClickHandler />
-        {waypoints.map((wp, idx) => (
-          <Marker key={idx} position={wp} icon={markerIcon} eventHandlers={{ click: () => removeWaypoint(idx) }} />
-        ))}
+        {/* Removido o bloco do Marker. Não exibe mais ícones! */}
         {routeGeoJSON && (
           <Polyline
             positions={routeGeoJSON.features[0].geometry.coordinates.map((c) => [c[1], c[0]])}

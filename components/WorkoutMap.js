@@ -4,6 +4,9 @@ import "leaflet/dist/leaflet.css";
 export default function WorkoutMap({ route }) {
   if (!route || route.length === 0) return null;
 
+  // Centraliza o mapa no primeiro ponto do percurso
+  const center = [route[0].lat, route[0].lng];
+
   return (
     <div
       style={{
@@ -18,7 +21,7 @@ export default function WorkoutMap({ route }) {
     >
       <MapContainer
         style={{ height: "100%", width: "100%" }}
-        center={[route[0].lat, route[0].lng]}
+        center={center}
         zoom={15}
         scrollWheelZoom
       >
@@ -26,12 +29,21 @@ export default function WorkoutMap({ route }) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
         />
-        <Polyline positions={route.map((p) => [p.lat, p.lng])} color="#00c6ff" weight={5} opacity={0.7} />
+        {/* Linha conectando todos os waypoints */}
+        <Polyline
+          positions={route.map((p) => [p.lat, p.lng])}
+          color="#00c6ff"
+          weight={5}
+          opacity={0.7}
+        />
+
+        {/* Destaca início em verde */}
         <CircleMarker
           center={[route[0].lat, route[0].lng]}
           radius={10}
           pathOptions={{ color: "green", fillColor: "green", fillOpacity: 1 }}
         />
+        {/* Destaca final em vermelho */}
         <CircleMarker
           center={[route[route.length - 1].lat, route[route.length - 1].lng]}
           radius={10}
