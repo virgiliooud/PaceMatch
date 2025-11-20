@@ -1,11 +1,13 @@
+// components/MapCreator.js
 import { MapContainer, TileLayer, Marker, Polyline, useMapEvents } from "react-leaflet";
-import { useState, useEffect } from "react";
-import axios from "axios";
+import { useState } from "react";
 import "leaflet/dist/leaflet.css";
+import axios from "axios";
 
-// Ícone do marcador (lado cliente apenas)
+// Corrige ícone do marker do Leaflet quando rodando no client
 let markerIcon = null;
 if (typeof window !== "undefined") {
+  // Só importa leaflet no cliente
   const L = require("leaflet");
   markerIcon = new L.Icon({
     iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
@@ -19,13 +21,13 @@ export default function MapCreator({ onRouteChange }) {
   const [routeGeoJSON, setRouteGeoJSON] = useState(null);
   const [distance, setDistance] = useState(0);
 
-  const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijk2MjE3OWE5YjI3MjRlMzVhNWYxNGU2MTNjMjJkNWNhIiwiaCI6Im11cm11cjY0In0="; // Insira sua chave válida
+  const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijk2MjE3OWE5YjI3MjRlMzVhNWYxNGU2MTNjMjJkNWNhIiwiaCI6Im11cm11cjY0In0="; // Substitua pela sua chave válida
 
   const calculateRoute = async (points) => {
     if (points.length < 2) {
       setRouteGeoJSON(null);
       setDistance(0);
-      if (onRouteChange) onRouteChange(points, 0); // Atualiza no pai
+      if (onRouteChange) onRouteChange(points, 0);
       return;
     }
     try {
@@ -44,7 +46,6 @@ export default function MapCreator({ onRouteChange }) {
       setRouteGeoJSON(res.data);
       const dist_km = res.data.features[0].properties.summary.distance / 1000;
       setDistance(dist_km);
-      // No callback, passe só array simples dos pontos
       if (onRouteChange) onRouteChange(points, dist_km);
     } catch (err) {
       setRouteGeoJSON(null);
