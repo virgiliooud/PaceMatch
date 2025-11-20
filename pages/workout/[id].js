@@ -17,7 +17,7 @@ import styles from '../../styles/WorkoutPage.module.css';
 
 // Importa o mapa dinamicamente
 import dynamic from "next/dynamic";
-const WorkoutMap = dynamic(() => import("../../components/WorkoutMap"), { ssr: false });
+const WorkoutMap = dynamic(() => import("../../components/MapCreator"), { ssr: false });
 
 export default function WorkoutPage() {
   const router = useRouter();
