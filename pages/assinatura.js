@@ -3,6 +3,7 @@ import styles from '../styles/Assinatura.module.css';
 
 export default function Assinatura() {
   const [loading, setLoading] = useState(false);
+  const [loadingTest, setLoadingTest] = useState(false);
 
   const handleSubscribe = async () => {
     setLoading(true);
@@ -18,6 +19,23 @@ export default function Assinatura() {
       alert("Erro ao conectar com o Stripe.");
     }
     setLoading(false);
+  };
+
+  // Função para produto teste (0,20)
+  const handleSubscribeTest = async () => {
+    setLoadingTest(true);
+    try {
+      const res = await fetch("/api/create-checkout-teste", { method: "POST" });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Erro ao criar sessão de teste.");
+      }
+    } catch {
+      alert("Erro ao conectar com o Stripe (teste).");
+    }
+    setLoadingTest(false);
   };
 
   return (
@@ -50,6 +68,22 @@ export default function Assinatura() {
             disabled={loading}
           >
             {loading ? "Carregando..." : "Assinar Agora"}
+          </button>
+        </div>
+        {/* Caixa de Checkout Teste */}
+        <div className={`${styles.card} ${styles.teste}`}>
+          <h2 className={styles.cardTitulo}>Teste Stripe</h2>
+          <p className={styles.price}>R$ 0,20 (para testar)</p>
+          <ul className={styles.features}>
+            <li>Compra de teste integrando o Stripe</li>
+            <li>Ideal para conferir o funcionamento</li>
+          </ul>
+          <button
+            className={styles.subscribeButton}
+            onClick={handleSubscribeTest}
+            disabled={loadingTest}
+          >
+            {loadingTest ? "Carregando..." : "Testar Checkout"}
           </button>
         </div>
       </div>
