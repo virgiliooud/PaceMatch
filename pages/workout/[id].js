@@ -11,13 +11,13 @@ import {
   query,
   where,
   getDocs,
-  Timestamp
+  Timestamp,
 } from "firebase/firestore";
-import styles from '../../styles/WorkoutPage.module.css';
+import styles from "../../styles/WorkoutPage.module.css";
 
-// Importa o mapa dinamicamente
+// Importa o componente de visualização de rotas
 import dynamic from "next/dynamic";
-const WorkoutMap = dynamic(() => import("../../components/MapCreator"), { ssr: false });
+const WorkoutMap = dynamic(() => import("../../components/WorkoutMap"), { ssr: false });
 
 export default function WorkoutPage() {
   const router = useRouter();
@@ -64,7 +64,7 @@ export default function WorkoutPage() {
       const userSnap = await getDoc(userRef);
       list.push({
         id: uid,
-        name: userSnap.exists() ? userSnap.data().name : "Usuário sem nome"
+        name: userSnap.exists() ? userSnap.data().name : "Usuário sem nome",
       });
     }
     setParticipants(list);
@@ -91,9 +91,12 @@ export default function WorkoutPage() {
         where("createdAt", ">=", Timestamp.fromDate(firstDay))
       );
 
-      const [criadosSnap, entrouSnap] = await Promise.all([getDocs(qCriados), getDocs(qEntrou)]);
-      const criadosIds = criadosSnap.docs.map(doc => doc.id);
-      const entrouIds = entrouSnap.docs.map(doc => doc.id);
+      const [criadosSnap, entrouSnap] = await Promise.all([
+        getDocs(qCriados),
+        getDocs(qEntrou),
+      ]);
+      const criadosIds = criadosSnap.docs.map((doc) => doc.id);
+      const entrouIds = entrouSnap.docs.map((doc) => doc.id);
       const totalUnico = new Set([...criadosIds, ...entrouIds]).size;
 
       if (totalUnico >= 3) {
@@ -104,14 +107,14 @@ export default function WorkoutPage() {
 
     const ref = doc(db, "workouts", id);
     await updateDoc(ref, {
-      participants: arrayUnion(user.uid)
+      participants: arrayUnion(user.uid),
     });
 
     loadParticipantsNames([...workout.participants, user.uid]);
 
     setWorkout({
       ...workout,
-      participants: [...workout.participants, user.uid]
+      participants: [...workout.participants, user.uid],
     });
   };
 
@@ -120,7 +123,7 @@ export default function WorkoutPage() {
     const ref = doc(db, "workouts", id);
 
     await updateDoc(ref, {
-      participants: arrayRemove(user.uid)
+      participants: arrayRemove(user.uid),
     });
 
     const filtered = participants.filter((p) => p.id !== user.uid);
@@ -128,7 +131,7 @@ export default function WorkoutPage() {
 
     setWorkout({
       ...workout,
-      participants: workout.participants.filter((p) => p !== user.uid)
+      participants: workout.participants.filter((p) => p !== user.uid),
     });
   };
 
@@ -147,20 +150,38 @@ export default function WorkoutPage() {
       <h1 className={styles.title}>{workout.name}</h1>
 
       <div className={styles.card}>
-        <p><strong>Tipo:</strong> {workout.type}</p>
-        <p><strong>Pace:</strong> {workout.pace}</p>
-        <p><strong>Local:</strong> {workout.location}</p>
-        <p><strong>Horário:</strong> {workout.time}</p>
-        {workout.date && <p><strong>Data:</strong> {new Date(workout.date).toLocaleDateString()}</p>}
-        {workout.distance && <p><strong>Distância:</strong> {workout.distance.toFixed(2)} km</p>}
+        <p>
+          <strong>Tipo:</strong> {workout.type}
+        </p>
+        <p>
+          <strong>Pace:</strong> {workout.pace}
+        </p>
+        <p>
+          <strong>Local:</strong> {workout.location}
+        </p>
+        <p>
+          <strong>Horário:</strong> {workout.time}
+        </p>
+        {workout.date && (
+          <p>
+            <strong>Data:</strong> {new Date(workout.date).toLocaleDateString()}
+          </p>
+        )}
+        {workout.distance && (
+          <p>
+            <strong>Distância:</strong> {workout.distance.toFixed(2)} km
+          </p>
+        )}
       </div>
 
-      {/* Use o componente dinâmico para o mapa */}
+      {/* Exibição da rota salva */}
       {workout.route && workout.route.length > 0 && (
         <WorkoutMap route={workout.route} />
       )}
 
-      {user && Array.isArray(workout.participants) && workout.participants.includes(user.uid) ? (
+      {user &&
+      Array.isArray(workout.participants) &&
+      workout.participants.includes(user.uid) ? (
         <button
           className={`${styles.button} ${styles.leave}`}
           onClick={leaveWorkout}
@@ -198,16 +219,26 @@ export default function WorkoutPage() {
           <div className={styles.modalContent}>
             <h2>Limite atingido!</h2>
             <p>
-              No plano básico, você só pode participar ou criar até <b>3 treinos</b> no mês.<br />
+              No plano básico, você só pode participar ou criar até <b>3 treinos</b>{" "}
+              no mês.
+              <br />
               Para liberar treinos ilimitados, assine o Premium!
             </p>
-            <button className={styles.assinarBtn} onClick={() => {
-              setShowLimitModal(false);
-              router.push("/assinatura");
-            }}>
+            <button
+              className={styles.assinarBtn}
+              onClick={() => {
+                setShowLimitModal(false);
+                router.push("/assinatura");
+              }}
+            >
               Assinar Premium
             </button>
-            <button className={styles.fecharBtn} onClick={() => setShowLimitModal(false)}>Fechar</button>
+            <button
+              className={styles.fecharBtn}
+              onClick={() => setShowLimitModal(false)}
+            >
+              Fechar
+            </button>
           </div>
         </div>
       )}

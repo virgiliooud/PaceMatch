@@ -1,13 +1,10 @@
-// components/MapCreator.js
 import { MapContainer, TileLayer, Marker, Polyline, useMapEvents } from "react-leaflet";
 import { useState } from "react";
-import "leaflet/dist/leaflet.css";
 import axios from "axios";
+import "leaflet/dist/leaflet.css";
 
-// Corrige ícone do marker do Leaflet quando rodando no client
 let markerIcon = null;
 if (typeof window !== "undefined") {
-  // Só importa leaflet no cliente
   const L = require("leaflet");
   markerIcon = new L.Icon({
     iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
@@ -21,7 +18,7 @@ export default function MapCreator({ onRouteChange }) {
   const [routeGeoJSON, setRouteGeoJSON] = useState(null);
   const [distance, setDistance] = useState(0);
 
-  const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijk2MjE3OWE5YjI3MjRlMzVhNWYxNGU2MTNjMjJkNWNhIiwiaCI6Im11cm11cjY0In0="; // Substitua pela sua chave válida
+  const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijk2MjE3OWE5YjI3MjRlMzVhNWYxNGU2MTNjMjJkNWNhIiwiaCI6Im11cm11cjY0In0=";
 
   const calculateRoute = async (points) => {
     if (points.length < 2) {
@@ -39,8 +36,8 @@ export default function MapCreator({ onRouteChange }) {
         {
           headers: {
             Authorization: `Bearer ${ORS_API_KEY}`,
-            "Content-Type": "application/json"
-          }
+            "Content-Type": "application/json",
+          },
         }
       );
       setRouteGeoJSON(res.data);
@@ -57,12 +54,12 @@ export default function MapCreator({ onRouteChange }) {
   function ClickHandler() {
     useMapEvents({
       click(e) {
-        setWaypoints(prev => {
+        setWaypoints((prev) => {
           const newPoints = [...prev, e.latlng];
           calculateRoute(newPoints);
           return newPoints;
         });
-      }
+      },
     });
     return null;
   }
@@ -76,30 +73,23 @@ export default function MapCreator({ onRouteChange }) {
 
   return (
     <div style={{ height: "350px", width: "100%", marginBottom: 20 }}>
-      <MapContainer center={[-27.5954, -48.5480]} zoom={13} style={{ height: "100%", width: "100%" }}>
+      <MapContainer center={[-27.5954, -48.548]} zoom={13} style={{ height: "100%", width: "100%" }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
         />
         <ClickHandler />
         {waypoints.map((wp, idx) => (
-          <Marker
-            key={idx}
-            position={wp}
-            icon={markerIcon}
-            eventHandlers={{ click: () => removeWaypoint(idx) }}
-          />
+          <Marker key={idx} position={wp} icon={markerIcon} eventHandlers={{ click: () => removeWaypoint(idx) }} />
         ))}
         {routeGeoJSON && (
           <Polyline
-            positions={routeGeoJSON.features[0].geometry.coordinates.map(c => [c[1], c[0]])}
+            positions={routeGeoJSON.features[0].geometry.coordinates.map((c) => [c[1], c[0]])}
             color="#00c6ff"
           />
         )}
       </MapContainer>
-      <p style={{ color: "#fff", fontWeight: 500, marginTop: 8 }}>
-        Distância: {distance.toFixed(2)} km
-      </p>
+      <p style={{ color: "#fff", fontWeight: 500, marginTop: 8 }}>Distância: {distance.toFixed(2)} km</p>
     </div>
   );
 }
