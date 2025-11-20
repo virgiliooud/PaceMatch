@@ -15,8 +15,9 @@ import {
 } from "firebase/firestore";
 import styles from '../../styles/WorkoutPage.module.css';
 
-import { MapContainer, TileLayer, Polyline, CircleMarker } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
+// Importa o mapa dinamicamente
+import dynamic from "next/dynamic";
+const WorkoutMap = dynamic(() => import("../../components/WorkoutMap"), { ssr: false });
 
 export default function WorkoutPage() {
   const router = useRouter();
@@ -53,6 +54,7 @@ export default function WorkoutPage() {
     };
 
     loadWorkout();
+    // eslint-disable-next-line
   }, [id]);
 
   const loadParticipantsNames = async (ids) => {
@@ -70,8 +72,6 @@ export default function WorkoutPage() {
 
   const joinWorkout = async () => {
     if (!user) return;
-
-    // Verifica o plano e faz limitação igual createWorkout.js
     const userRef = await getDoc(doc(db, "users", user.uid));
     const plano = userRef.exists() ? userRef.data().plano || "basic" : "basic";
 
@@ -98,7 +98,7 @@ export default function WorkoutPage() {
 
       if (totalUnico >= 3) {
         setShowLimitModal(true);
-        return; // Bloqueia entrada
+        return;
       }
     }
 
@@ -155,41 +155,9 @@ export default function WorkoutPage() {
         {workout.distance && <p><strong>Distância:</strong> {workout.distance.toFixed(2)} km</p>}
       </div>
 
+      {/* Use o componente dinâmico para o mapa */}
       {workout.route && workout.route.length > 0 && (
-        <div style={{ height: "300px", width: "100%", maxWidth: "600px", margin: "20px auto", borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
-          <MapContainer
-            style={{ height: "100%", width: "100%" }}
-            center={[workout.route[0].lat, workout.route[0].lng]}
-            zoom={15}
-            scrollWheelZoom={true}
-            dragging={true}
-            doubleClickZoom={true}
-            zoomControl={true}
-            attributionControl={false}
-            keyboard={false}
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
-            />
-            <Polyline
-              positions={workout.route.map(p => [p.lat, p.lng])}
-              color="#00c6ff"
-              weight={5}
-              opacity={0.7}
-            />
-            <CircleMarker
-              center={[workout.route[0].lat, workout.route[0].lng]}
-              radius={10}
-              pathOptions={{ color: "green", fillColor: "green", fillOpacity: 1 }}
-            />
-            <CircleMarker
-              center={[workout.route[workout.route.length - 1].lat, workout.route[workout.route.length - 1].lng]}
-              radius={10}
-              pathOptions={{ color: "red", fillColor: "red", fillOpacity: 1 }}
-            />
-          </MapContainer>
-        </div>
+        <WorkoutMap route={workout.route} />
       )}
 
       {user && Array.isArray(workout.participants) && workout.participants.includes(user.uid) ? (
@@ -235,7 +203,7 @@ export default function WorkoutPage() {
             </p>
             <button className={styles.assinarBtn} onClick={() => {
               setShowLimitModal(false);
-              router.push("/assinatura"); // Altere para sua rota de assinatura
+              router.push("/assinatura");
             }}>
               Assinar Premium
             </button>
@@ -243,7 +211,6 @@ export default function WorkoutPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
