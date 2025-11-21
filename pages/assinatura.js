@@ -62,10 +62,10 @@ export default function Assinatura() {
             <li>Receba notificações exclusivas</li>
             <li>Acesso a futuras funções avançadas</li>
           </ul>
-          <button
-            className={styles.subscribeButton}
-            onClick={handleSubscribe}
-            disabled={loading}
+//          <button
+//            className={styles.subscribeButton}
+//            onClick={handleSubscribe}
+//           disabled={loading}
           >
             {loading ? "Carregando..." : "Assinar Agora"}
           </button>
