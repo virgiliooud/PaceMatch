@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
 import AuthProvider from "../components/AuthProvider";
-import Chatbot from "../components/Chatbot";  // Componente do Dialogflow
 
 export default function MyApp({ Component, pageProps }) {
   const router = useRouter();
@@ -43,7 +42,6 @@ export default function MyApp({ Component, pageProps }) {
   return (
     <AuthProvider>
       <Component {...pageProps} />
-      <Chatbot />  {/* Chatbot do Dialogflow */}
     </AuthProvider>
   );
 }
