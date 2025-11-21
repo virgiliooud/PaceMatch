@@ -1,15 +1,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { db, auth } from "../firebase";
-import { collection, onSnapshot, doc, deleteDoc } from "firebase/firestore";
-import styles from "../styles/HomePage.module.css";
+import { collection, onSnapshot, doc, deleteDoc, query, where, orderBy } from "firebase/firestore";
 import { useRouter } from "next/router";
+import styles from "../styles/MyWorkouts.module.css";
 
 export default function MyWorkouts() {
   const [user, setUser] = useState(null);
   const [myWorkouts, setMyWorkouts] = useState([]);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [trainingToDelete, setTrainingToDelete] = useState(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -18,125 +17,223 @@ export default function MyWorkouts() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-    const unsub = onSnapshot(collection(db, "workouts"), (snap) => {
+    const workoutsQuery = query(
+      collection(db, "workouts"),
+      where("participants", "array-contains", user.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsub = onSnapshot(workoutsQuery, (snap) => {
       const list = snap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
         .filter(
           w =>
-            w.participants?.includes(user.uid) &&
             w.name &&
             w.name.trim().length > 0 &&
             Array.isArray(w.route) &&
-            w.route.length > 1
+            w.route.length > 0
         );
       setMyWorkouts(list);
+      setLoading(false);
     });
 
     return unsub;
   }, [user]);
 
-  const handleDeleteClick = (id) => {
-    setTrainingToDelete(id);
-    setShowDeleteModal(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!trainingToDelete) return;
+  const handleDelete = async (id) => {
+    const confirm = window.confirm("Tem certeza que deseja deletar este treino? Essa ação não pode ser desfeita.");
+    if (!confirm) return;
 
     try {
-      await deleteDoc(doc(db, "workouts", trainingToDelete));
-      // Remove os alerts nativos que não funcionam no iPhone
-      // Você pode adicionar um toast ou feedback visual depois
-      setShowDeleteModal(false);
-      setTrainingToDelete(null);
+      await deleteDoc(doc(db, "workouts", id));
+      alert("Treino deletado com sucesso!");
     } catch (error) {
-      console.error("Erro ao deletar treino: ", error);
-      setShowDeleteModal(false);
-      setTrainingToDelete(null);
+      alert("Erro ao deletar treino: " + error.message);
     }
   };
 
-  const cancelDelete = () => {
-    setShowDeleteModal(false);
-    setTrainingToDelete(null);
+  const formatarData = (dateString) => {
+    if (!dateString) return "Data não definida";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('pt-BR');
+    } catch {
+      return "Data inválida";
+    }
   };
 
-  if (!user)
+  if (!user) {
     return (
-      <div className={styles.loginMessage}>
-        <h1>Faça login primeiro</h1>
-        <Link href="/login" className={styles.loginLink}>
-          Ir para Login
-        </Link>
+      <div className={styles.container}>
+        <div className={styles.logoContainer}>
+          <img src="/logo.png" alt="PaceMatch Logo" className={styles.logo} />
+        </div>
+        <div className={styles.loginMessage}>
+          <h1 className={styles.loginTitle}>Faça login primeiro</h1>
+          <p className={styles.loginSubtitle}>Acesse sua conta para ver seus treinos</p>
+          <Link href="/login" className={styles.loginButton}>
+            🏃‍♂️ Fazer Login
+          </Link>
+        </div>
       </div>
     );
+  }
+
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.logoContainer}>
+          <img src="/logo.png" alt="PaceMatch Logo" className={styles.logo} />
+        </div>
+        <div className={styles.loading}>
+          <div className={styles.spinner}></div>
+          <p>Carregando seus treinos...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>
-      {/* Modal de Confirmação */}
-      {showDeleteModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <h3 className={styles.modalTitle}>Deletar Treino?</h3>
-            <p className={styles.modalText}>
-              Tem certeza que quer deletar esse treino? Essa porra não tem volta!
-            </p>
-            <div className={styles.modalButtons}>
-              <button
-                onClick={cancelDelete}
-                className={styles.cancelButton}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDelete}
-                className={styles.confirmDeleteButton}
-              >
-                Deletar
-              </button>
-            </div>
-          </div>
+      {/* Header */}
+      <div className={styles.header}>
+        <Link href="/home" className={styles.backButton}>
+          ← Voltar
+        </Link>
+        
+        <div className={styles.logoContainer}>
+          <img src="/logo.png" alt="PaceMatch Logo" className={styles.logo} />
         </div>
-      )}
 
-      <Link href="/home" className={styles.backLink}>
-        ← Voltar à Home
-      </Link>
+        <div className={styles.userInfo}>
+          <img
+            src={user?.photoURL || "/default-avatar.png"}
+            alt="Foto"
+            className={styles.profileImg}
+          />
+        </div>
+      </div>
 
-      <h2 className={styles.title}>Meus Treinos</h2>
-
-      {myWorkouts.map((workout) => (
-        <div key={workout.id} className={styles.card}>
-          <h3>{workout.name}</h3>
-          <p>Tipo: {workout.type}</p>
-          <p>Pace: {workout.pace}</p>
-          <p>Local: {workout.location}</p>
-          <p>Horário: {workout.time}</p>
-          <p className={styles.participants}>
-            Participantes: {workout.participants ? workout.participants.length : 0}
+      {/* Conteúdo Principal */}
+      <div className={styles.content}>
+        <div className={styles.welcomeSection}>
+          <h1 className={styles.title}>Meus Treinos</h1>
+          <p className={styles.subtitle}>
+            {myWorkouts.length > 0 
+              ? `🎯 ${myWorkouts.length} treinos encontrados` 
+              : "📝 Você ainda não participa de nenhum treino"}
           </p>
-
-          <div className={styles.cardButtons}>
-            <button
-              className={styles.primaryButton}
-              onClick={() => router.push(`/workout/${workout.id}`)}
-            >
-              Ver Treino
-            </button>
-
-            {workout.creatorId === user.uid && (
-              <button
-                className={styles.deleteButton}
-                onClick={() => handleDeleteClick(workout.id)}
-              >
-                Deletar
-              </button>
-            )}
-          </div>
         </div>
-      ))}
+
+        {/* Ação Rápida */}
+        <div className={styles.quickAction}>
+          <Link href="/createWorkout" className={styles.createButton}>
+            🏃‍♂️ Criar Novo Treino
+          </Link>
+        </div>
+
+        {/* Lista de Treinos */}
+        <div className={styles.workoutsGrid}>
+          {myWorkouts.length === 0 ? (
+            <div className={styles.emptyState}>
+              <div className={styles.emptyIcon}>🏃‍♂️</div>
+              <h3>Nenhum treino encontrado</h3>
+              <p>Você ainda não está participando de nenhum treino.</p>
+              <div className={styles.emptyActions}>
+                <Link href="/createWorkout" className={styles.primaryButton}>
+                  🏃‍♂️ Criar Primeiro Treino
+                </Link>
+                <Link href="/home" className={styles.secondaryButton}>
+                  🔍 Explorar Treinos
+                </Link>
+              </div>
+            </div>
+          ) : (
+            myWorkouts.map((workout) => (
+              <div key={workout.id} className={styles.workoutCard}>
+                <div className={styles.cardHeader}>
+                  <div className={styles.workoutTitleSection}>
+                    <h3 className={styles.workoutName}>
+                      {workout.name}
+                      {workout.isPrivate && (
+                        <span className={styles.privateBadge} title="Treino Privado">
+                          🔒
+                        </span>
+                      )}
+                      {workout.creatorId === user.uid && (
+                        <span className={styles.ownerBadge} title="Você é o criador">
+                          👑
+                        </span>
+                      )}
+                    </h3>
+                    <div className={styles.workoutMeta}>
+                      <span className={styles.workoutType}>{workout.type}</span>
+                      <span className={styles.workoutPace}>⏱️ {workout.pace}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.cardContent}>
+                  <div className={styles.workoutInfo}>
+                    <div className={styles.infoItem}>
+                      <span className={styles.infoLabel}>📍</span>
+                      {workout.location}
+                    </div>
+                    <div className={styles.infoItem}>
+                      <span className={styles.infoLabel}>📅</span>
+                      {formatarData(workout.date)}
+                    </div>
+                    <div className={styles.infoItem}>
+                      <span className={styles.infoLabel}>🕒</span>
+                      {workout.time}
+                    </div>
+                    <div className={styles.infoItem}>
+                      <span className={styles.infoLabel}>👥</span>
+                      {workout.participants?.length || 0} participantes
+                    </div>
+                  </div>
+
+                  {workout.distance && (
+                    <div className={styles.distanceBadge}>
+                      📏 {workout.distance} km
+                    </div>
+                  )}
+                </div>
+
+                <div className={styles.cardActions}>
+                  <button
+                    onClick={() => router.push(`/workout/${workout.id}`)}
+                    className={styles.viewButton}
+                  >
+                    👀 Ver Detalhes
+                  </button>
+                  
+                  <button
+                    onClick={() => router.push(`/workoutChats/${workout.id}`)}
+                    className={styles.chatButton}
+                  >
+                    💬 Chat
+                  </button>
+
+                  {workout.creatorId === user.uid && (
+                    <button
+                      onClick={() => handleDelete(workout.id)}
+                      className={styles.deleteButton}
+                    >
+                      🗑️ Deletar
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }
