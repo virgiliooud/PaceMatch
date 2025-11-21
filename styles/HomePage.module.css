@@ -575,11 +575,7 @@
 /* CORREÇÕES NO CSS */
 
 /* ✅ Saudação sem gradiente azul */
-.greeting {
-  font-size: 2rem;
-  margin-bottom: 8px;
-  color: white; /* CORRIGIDO: Texto branco normal */
-}
+
 
 /* ✅ Layout melhorado dos filtros */
 .filtersGrid {
