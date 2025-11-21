@@ -9,7 +9,7 @@ export default async function handler(req, res) {
         mode: "subscription", // Único pagamento (produto teste)
         line_items: [
           {
-            price: "price_1SVhWiKAfVdjPCM9fGdWRzZx", // coloque aqui o PRICE_ID do produto teste
+            price: "price_1SViSWKAfVdjPCM9xO9qcUTq", // coloque aqui o PRICE_ID do produto teste
             quantity: 1,
           },
         ],
