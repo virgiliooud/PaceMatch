@@ -1,20 +1,19 @@
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { db, auth } from "../firebase";
-import { collection, onSnapshot, doc, getDoc, query, orderBy } from "firebase/firestore";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import styles from "../styles/HomePage.module.css";
+import { db, auth } from "../firebase";
+import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
+import styles from "../styles/CreateWorkout.module.css";
 
 const cidades = [
   "São Paulo",
-  "Rio de Janeiro",
+  "Rio de Janeiro", 
   "Belo Horizonte",
   "Curitiba",
   "Porto Alegre",
   "Brasília",
   "Recife",
   "Fortaleza",
-  "Salvador",
+  "Salvador", 
   "Manaus",
   "Florianópolis e região",
 ];
@@ -25,18 +24,27 @@ const paceOptions = [
   "7:30", "7:45", "8:00", "8:15", "8:30", "8:45", "9:00", "9:15", "9:30", "9:45", "10:00"
 ];
 
-export default function HomePage() {
+export default function CreateWorkout() {
+  const router = useRouter();
   const [user, setUser] = useState(null);
   const [userPlano, setUserPlano] = useState("basic");
-  const [workouts, setWorkouts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  const [cidadeFiltro, setCidadeFiltro] = useState("");
-  const [paceFiltro, setPaceFiltro] = useState("");
-  const [publicoPrivadoFiltro, setPublicoPrivadoFiltro] = useState("todos");
-  const [nomeFiltro, setNomeFiltro] = useState("");
-
-  const router = useRouter();
+  // Estados do formulário
+  const [formData, setFormData] = useState({
+    name: "",
+    type: "running",
+    location: "",
+    date: "",
+    time: "",
+    pace: "",
+    paceMin: "",
+    paceMax: "",
+    distance: "",
+    description: "",
+    isPrivate: false,
+    route: []
+  });
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
@@ -47,108 +55,93 @@ export default function HomePage() {
           const plano = userDoc.exists() ? userDoc.data().plano || "basic" : "basic";
           setUserPlano(plano);
         } catch (error) {
-          console.error("❌ Erro ao buscar plano:", error);
+          console.error("Erro ao buscar plano:", error);
         }
+      } else {
+        router.push("/login");
       }
     });
     return unsub;
-  }, []);
+  }, [router]);
 
-  useEffect(() => {
-    try {
-      const workoutsQuery = query(
-        collection(db, "workouts"), 
-        orderBy("createdAt", "desc")
-      );
-      
-      const unsub = onSnapshot(workoutsQuery, 
-        (snapshot) => {
-          const list = snapshot.docs.map((doc) => {
-            const data = doc.data();
-            return { 
-              id: doc.id, 
-              ...data,
-              name: data.name || "Treino sem nome",
-              location: data.location || "Local não definido",
-              route: data.route || [],
-              participants: data.participants || [],
-              isPrivate: data.isPrivate || false
-            };
-          });
-          
-          setWorkouts(list);
-          setLoading(false);
-        },
-        (error) => {
-          console.error("❌ ERRO NO LISTENER:", error);
-          setLoading(false);
-        }
-      );
-
-      return unsub;
-    } catch (error) {
-      console.error("❌ ERRO AO CONFIGURAR LISTENER:", error);
-      setLoading(false);
-    }
-  }, []);
-
-  const workoutsValidos = workouts.filter((workout) => {
-    if (!workout.name || workout.name.trim() === "" || !workout.route || workout.route.length === 0) {
-      return false;
-    }
-
-    if (cidadeFiltro && workout.location !== cidadeFiltro) return false;
-
-    if (paceFiltro && workout.pace && !workout.pace.includes(paceFiltro)) {
-      return false;
-    }
-
-    if (publicoPrivadoFiltro === "publico" && workout.isPrivate) return false;
-    if (publicoPrivadoFiltro === "privado" && !workout.isPrivate) return false;
-
-    if (nomeFiltro && !workout.name.toLowerCase().includes(nomeFiltro.toLowerCase())) return false;
-    
-    return true;
-  });
-
-  const formatarData = (dateString) => {
-    if (!dateString) return "Data não definida";
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('pt-BR');
-    } catch {
-      return "Data inválida";
-    }
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value
+    }));
   };
 
-  const isParticipante = (workout) => {
-    return user && workout.participants?.includes(user.uid);
+  const handlePaceChange = (e) => {
+    const paceValue = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      pace: paceValue,
+      // Define min e max automaticamente baseado no pace selecionado
+      paceMin: paceValue,
+      paceMax: paceValue
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!user) {
+      alert("Você precisa estar logado para criar um treino!");
+      return;
+    }
+
+    // Validações básicas
+    if (!formData.name.trim()) {
+      alert("Por favor, insira um nome para o treino!");
+      return;
+    }
+
+    if (!formData.location) {
+      alert("Por favor, selecione uma cidade!");
+      return;
+    }
+
+    if (!formData.date || !formData.time) {
+      alert("Por favor, insira data e hora do treino!");
+      return;
+    }
+
+    if (!formData.pace) {
+      alert("Por favor, selecione um pace!");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const workoutData = {
+        ...formData,
+        createdBy: user.uid,
+        createdByName: user.displayName || user.email,
+        createdAt: serverTimestamp(),
+        participants: [user.uid], // Criador é automaticamente participante
+        participantCount: 1
+      };
+
+      const docRef = await addDoc(collection(db, "workouts"), workoutData);
+      
+      console.log("✅ Treino criado com ID:", docRef.id);
+      alert("Treino criado com sucesso!");
+      router.push("/");
+      
+    } catch (error) {
+      console.error("❌ Erro ao criar treino:", error);
+      alert("Erro ao criar treino. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!user) {
     return (
       <div className={styles.container}>
-        <div className={styles.logoContainer}>
-          <img src="/logo.png" alt="PaceMatch Logo" className={styles.logo} />
-        </div>
-        <h1 className={styles.welcomeTitle}>PaceMatch</h1>
-        <p className={styles.welcomeSubtitle}>Encontre parceiros de treino perfeitos</p>
-        <Link href="/login" className={styles.button}>
-          🏃‍♂️ Fazer Login
-        </Link>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.logoContainer}>
-          <img src="/logo.png" alt="PaceMatch Logo" className={styles.logo} />
-        </div>
         <div className={styles.loading}>
-          <div className={styles.spinner}></div>
-          <p>Carregando treinos...</p>
+          <p>Carregando...</p>
         </div>
       </div>
     );
@@ -158,194 +151,217 @@ export default function HomePage() {
     <div className={styles.container}>
       {/* Header */}
       <div className={styles.header}>
-        <div className={styles.logoContainer}>
-          <img src="/logo.png" alt="PaceMatch Logo" className={styles.logo} />
-        </div>
-
+        <button 
+          onClick={() => router.back()} 
+          className={styles.backButton}
+        >
+          ← Voltar
+        </button>
+        
         <div className={styles.userSection}>
           <img
             src={user?.photoURL || "/default-avatar.png"}
             alt="Foto"
-            onClick={() => router.push("/profile")}
             className={styles.profileImg}
           />
-          <div 
-            className={`${styles.planoBadge} ${userPlano === "premium" ? styles.premium : styles.basic}`}
-            onClick={() => router.push("/assinatura")}
-          >
+          <div className={`${styles.planoBadge} ${userPlano === "premium" ? styles.premium : styles.basic}`}>
             {userPlano === "premium" ? "⭐ Premium" : "🔹 Básico"}
           </div>
         </div>
       </div>
 
-      {/* ✅ CORREÇÃO: EMOJI NÃO AZUL */}
-      <div className={styles.welcomeSection}>
-        <h1 className={styles.greeting}>
-          Olá, {user.displayName?.split(" ")[0] || "Amigo"}! 👋
-        </h1>
-        <p className={styles.subText}>
-          {workoutsValidos.length > 0 
-            ? `📊 ${workoutsValidos.length} treinos disponíveis` 
-            : "📝 Nenhum treino encontrado - seja o primeiro a criar!"}
-        </p>
-      </div>
+      <div className={styles.content}>
+        <h1 className={styles.title}>🏃‍♂️ Criar Novo Treino</h1>
+        <p className={styles.subtitle}>Compartilhe seu treino e encontre parceiros</p>
 
-      {/* Ações Rápidas */}
-      <div className={styles.quickActions}>
-        <Link href="/createWorkout" className={styles.primaryButton}>
-          🏃‍♂️ Criar Treino
-        </Link>
-        <Link href="/myWorkouts" className={styles.secondaryButton}>
-          📋 Meus Treinos
-        </Link>
-      </div>
-
-      {/* Filtros */}
-      <div className={styles.filtersSection}>
-        <h3>🔍 Filtros</h3>
-        
-        <div className={styles.filtersGrid}>
-          <select
-            value={cidadeFiltro}
-            onChange={(e) => setCidadeFiltro(e.target.value)}
-            className={styles.filterSelect}
-          >
-            <option value="">🌆 Todas as cidades</option>
-            {cidades.map((cidade) => (
-              <option key={cidade} value={cidade}>
-                {cidade}
-              </option>
-            ))}
-          </select>
-
-          {/* ✅ CORREÇÃO: FILTRO DE PACE ÚNICO */}
-          <select
-            value={paceFiltro}
-            onChange={(e) => setPaceFiltro(e.target.value)}
-            className={styles.filterSelect}
-          >
-            <option value="">⏱️ Todos os paces</option>
-            {paceOptions.map((pace) => (
-              <option key={pace} value={pace}>
-                {pace} min/km
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={publicoPrivadoFiltro}
-            onChange={(e) => setPublicoPrivadoFiltro(e.target.value)}
-            className={styles.filterSelect}
-          >
-            <option value="todos">🌐 Todos os treinos</option>
-            <option value="publico">🔓 Apenas públicos</option>
-            <option value="privado">🔒 Apenas privados</option>
-          </select>
-
-          <input
-            type="text"
-            placeholder="🔎 Buscar por nome..."
-            value={nomeFiltro}
-            onChange={(e) => setNomeFiltro(e.target.value)}
-            className={styles.filterInput}
-          />
-        </div>
-
-        {(cidadeFiltro || paceFiltro || publicoPrivadoFiltro !== "todos" || nomeFiltro) && (
-          <button
-            onClick={() => {
-              setCidadeFiltro("");
-              setPaceFiltro("");
-              setPublicoPrivadoFiltro("todos");
-              setNomeFiltro("");
-            }}
-            className={styles.clearFiltersButton}
-          >
-            🗑️ Limpar Filtros
-          </button>
-        )}
-      </div>
-
-      {/* Lista de Treinos */}
-      <div className={styles.workoutsGrid}>
-        {workoutsValidos.length === 0 ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>🏃‍♂️</div>
-            <h3>Nenhum treino encontrado</h3>
-            <p>
-              {workouts.length === 0 
-                ? "Seja o primeiro a criar um treino!" 
-                : "Tente ajustar os filtros para ver mais resultados."}
-            </p>
-            <Link href="/createWorkout" className={styles.button}>
-              🏃‍♂️ Criar Primeiro Treino
-            </Link>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          {/* Nome do Treino */}
+          <div className={styles.formGroup}>
+            <label htmlFor="name" className={styles.label}>
+              Nome do Treino *
+            </label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              placeholder="Ex: Corrida no Parque, Treino Longo Domingo..."
+              className={styles.input}
+              required
+            />
           </div>
-        ) : (
-          workoutsValidos.map((workout) => (
-            <div key={workout.id} className={styles.workoutCard}>
-              <div className={styles.cardHeader}>
-                <h3 className={styles.workoutName}>
-                  {workout.name}
-                  {workout.isPrivate && (
-                    <span className={styles.privateBadge} title="Treino Privado">
-                      🔒
-                    </span>
-                  )}
-                </h3>
-                <div className={styles.workoutMeta}>
-                  <span className={styles.workoutType}>{workout.type}</span>
-                  <span className={styles.workoutPace}>⏱️ {workout.pace}</span>
-                </div>
-              </div>
 
-              <div className={styles.cardContent}>
-                <div className={styles.workoutInfo}>
-                  <div className={styles.infoItem}>
-                    <span className={styles.infoLabel}>📍</span>
-                    {workout.location}
-                  </div>
-                  <div className={styles.infoItem}>
-                    <span className={styles.infoLabel}>📅</span>
-                    {formatarData(workout.date)}
-                  </div>
-                  <div className={styles.infoItem}>
-                    <span className={styles.infoLabel}>🕒</span>
-                    {workout.time}
-                  </div>
-                  <div className={styles.infoItem}>
-                    <span className={styles.infoLabel}>👥</span>
-                    {workout.participants?.length || 0} participantes
-                  </div>
-                </div>
+          {/* Tipo de Treino */}
+          <div className={styles.formGroup}>
+            <label htmlFor="type" className={styles.label}>
+              Tipo de Treino
+            </label>
+            <select
+              id="type"
+              name="type"
+              value={formData.type}
+              onChange={handleChange}
+              className={styles.select}
+            >
+              <option value="running">🏃‍♂️ Corrida</option>
+              <option value="cycling">🚴‍♂️ Ciclismo</option>
+              <option value="walking">🚶‍♂️ Caminhada</option>
+              <option value="trail">🥾 Trail Running</option>
+            </select>
+          </div>
 
-                {workout.distance && (
-                  <div className={styles.distanceBadge}>
-                    📏 {workout.distance} km
-                  </div>
-                )}
-              </div>
+          {/* Localização */}
+          <div className={styles.formGroup}>
+            <label htmlFor="location" className={styles.label}>
+              Cidade *
+            </label>
+            <select
+              id="location"
+              name="location"
+              value={formData.location}
+              onChange={handleChange}
+              className={styles.select}
+              required
+            >
+              <option value="">Selecione uma cidade</option>
+              {cidades.map((cidade) => (
+                <option key={cidade} value={cidade}>
+                  {cidade}
+                </option>
+              ))}
+            </select>
+          </div>
 
-              <div className={styles.cardActions}>
-                <button
-                  onClick={() => router.push(`/workout/${workout.id}`)}
-                  className={styles.viewButton}
-                >
-                  👀 Ver Detalhes
-                </button>
-                
-                {isParticipante(workout) && (
-                  <button
-                    onClick={() => router.push(`/workoutChats/${workout.id}`)}
-                    className={styles.chatButton}
-                  >
-                    💬 Chat
-                  </button>
-                )}
-              </div>
+          {/* Data e Hora */}
+          <div className={styles.formRow}>
+            <div className={styles.formGroup}>
+              <label htmlFor="date" className={styles.label}>
+                Data *
+              </label>
+              <input
+                type="date"
+                id="date"
+                name="date"
+                value={formData.date}
+                onChange={handleChange}
+                className={styles.input}
+                required
+                min={new Date().toISOString().split('T')[0]}
+              />
             </div>
-          ))
-        )}
+
+            <div className={styles.formGroup}>
+              <label htmlFor="time" className={styles.label}>
+                Hora *
+              </label>
+              <input
+                type="time"
+                id="time"
+                name="time"
+                value={formData.time}
+                onChange={handleChange}
+                className={styles.input}
+                required
+              />
+            </div>
+          </div>
+
+          {/* Pace */}
+          <div className={styles.formGroup}>
+            <label htmlFor="pace" className={styles.label}>
+              Pace (min/km) *
+            </label>
+            <select
+              id="pace"
+              name="pace"
+              value={formData.pace}
+              onChange={handlePaceChange}
+              className={styles.select}
+              required
+            >
+              <option value="">Selecione o pace</option>
+              {paceOptions.map((pace) => (
+                <option key={pace} value={pace}>
+                  {pace} min/km
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Distância */}
+          <div className={styles.formGroup}>
+            <label htmlFor="distance" className={styles.label}>
+              Distância (km) - Opcional
+            </label>
+            <input
+              type="number"
+              id="distance"
+              name="distance"
+              value={formData.distance}
+              onChange={handleChange}
+              placeholder="Ex: 5, 10, 21.1..."
+              step="0.1"
+              min="0"
+              className={styles.input}
+            />
+          </div>
+
+          {/* Descrição */}
+          <div className={styles.formGroup}>
+            <label htmlFor="description" className={styles.label}>
+              Descrição - Opcional
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="Descreva seu treino, local de encontro, observações..."
+              rows="4"
+              className={styles.textarea}
+            />
+          </div>
+
+          {/* Treino Privado */}
+          <div className={styles.formGroup}>
+            <label className={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                name="isPrivate"
+                checked={formData.isPrivate}
+                onChange={handleChange}
+                className={styles.checkbox}
+              />
+              <span className={styles.checkboxText}>
+                🔒 Tornar treino privado
+              </span>
+            </label>
+            <small className={styles.helpText}>
+              Treinos privados são visíveis apenas para participantes convidados
+            </small>
+          </div>
+
+          {/* Botões */}
+          <div className={styles.buttonGroup}>
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className={styles.cancelButton}
+              disabled={loading}
+            >
+              Cancelar
+            </button>
+            
+            <button
+              type="submit"
+              className={styles.submitButton}
+              disabled={loading}
+            >
+              {loading ? "Criando..." : "🎯 Criar Treino"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
