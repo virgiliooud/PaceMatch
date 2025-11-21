@@ -1,98 +1,92 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { auth, provider } from "../firebase";
-import { signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import { signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged } from "firebase/auth";
 import styles from "../styles/Login.module.css";
 
 export default function Login() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [checkingAuth, setCheckingAuth] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
-    // 🔧 CORREÇÃO PARA SAFARI: Verificar se há resultado de redirecionamento
-    const checkRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          console.log("Redirect result encontrado:", result.user);
-          setUser(result.user);
-          router.replace("/home");
-          return;
-        }
-      } catch (err) {
-        console.error("Erro no redirect result:", err);
-      }
+    // 🔧 DETECTAR iOS
+    const userAgent = navigator.userAgent;
+    const isIOSDevice = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+    setIsIOS(isIOSDevice);
+    
+    console.log("User Agent:", userAgent);
+    console.log("isIOS:", isIOSDevice);
 
-      // Se não há redirect, verifica auth state normal
-      const unsub = auth.onAuthStateChanged(
-        (u) => {
-          console.log("Auth state changed:", u);
-          setUser(u);
-          setCheckingAuth(false);
-          if (u) {
-            router.replace("/home");
-          }
-        },
-        (err) => {
-          console.error("onAuthStateChanged ERROR:", err);
-          setCheckingAuth(false);
-          setError(err?.message || "Erro na autenticação");
-        }
-      );
+    // 🔧 SOLUÇÃO PARA iPHONE: Gerenciamento de estado de auth simplificado
+    const unsub = onAuthStateChanged(auth, (user) => {
+      console.log("Auth State Changed - User:", user);
       
-      return unsub;
-    };
+      if (user) {
+        console.log("Usuário logado, redirecionando para /home");
+        // Usar replace para evitar histórico de navegação problemático
+        router.replace("/home");
+      } else {
+        console.log("Nenhum usuário logado");
+      }
+    });
 
-    checkRedirectResult();
+    // 🔧 IMPORTANTE: No iOS, verificar se há resultado de redirect pendente
+    if (isIOSDevice) {
+      const checkRedirect = async () => {
+        try {
+          console.log("Verificando redirect result no iOS...");
+          const result = await getRedirectResult(auth);
+          if (result?.user) {
+            console.log("Redirect result encontrado:", result.user);
+            // O onAuthStateChanged vai capturar isso e redirecionar
+          }
+        } catch (err) {
+          console.error("Erro no redirect check:", err);
+        }
+      };
+      checkRedirect();
+    }
+
+    return unsub;
   }, [router]);
 
   const doLogin = async () => {
     setLoginLoading(true);
     setError("");
+    
     try {
-      // 🔧 CORREÇÃO: Detecção mais robusta de dispositivos iOS/Safari
-      const userAgent = navigator.userAgent.toLowerCase();
-      const isIOS = /iphone|ipad|ipod/.test(userAgent);
-      const isSafari = /safari/.test(userAgent) && !/chrome/.test(userAgent);
-      
-      console.log("User Agent:", navigator.userAgent);
-      console.log("isIOS:", isIOS, "isSafari:", isSafari);
+      console.log("Iniciando login... isIOS:", isIOS);
 
-      // Usar redirect para iOS/Safari
-      if (isIOS || isSafari) {
-        console.log("Usando signInWithRedirect para Safari/iOS");
+      // 🔧 ESTRATÉGIA DIFERENCIADA PARA iOS
+      if (isIOS) {
+        console.log("Usando signInWithRedirect para iOS");
+        
+        // IMPORTANTE: No iOS, usar redirect é mais confiável
         await signInWithRedirect(auth, provider);
-        // Não setar loading false aqui - o redirect vai acontecer
+        
+        // Não setar loading false - o app vai recarregar
         return;
       } else {
-        console.log("Usando signInWithPopup para outros navegadores");
-        await signInWithPopup(auth, provider);
+        console.log("Usando signInWithPopup para outros dispositivos");
+        const result = await signInWithPopup(auth, provider);
+        console.log("Login popup success:", result.user);
+        
+        // No popup, podemos setar loading como false
         setLoginLoading(false);
+        
+        // O onAuthStateChanged vai capturar a mudança e redirecionar
       }
     } catch (err) {
-      console.error("LOGIN ERROR:", err);
+      console.error("ERRO NO LOGIN:", err);
       setError(err?.message || "Erro ao fazer login");
       setLoginLoading(false);
     }
   };
 
-  // 🔧 CORREÇÃO: Timeout para evitar tela preta infinita no Safari
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (checkingAuth) {
-        console.log("Timeout - forçando saída do loading");
-        setCheckingAuth(false);
-      }
-    }, 5000); // 5 segundos máximo
-
-    return () => clearTimeout(timeout);
-  }, [checkingAuth]);
-
-  // 🔧 CORREÇÃO: Loading mais informativo
-  if (checkingAuth) {
+  // 🔧 Loading específico para iOS
+  if (loginLoading && isIOS) {
     return (
       <div className={styles.container}>
         <h1 className={styles.title}>PaceMatch</h1>
@@ -102,25 +96,14 @@ export default function Login() {
           color: '#fff',
           textAlign: 'center'
         }}>
-          <div>Verificando autenticação...</div>
+          <div>🔗 Redirecionando para login...</div>
           <div style={{ 
             fontSize: '12px', 
             color: '#ccc',
             marginTop: '10px'
           }}>
-            Se demorar, recarregue a página
+            Se não redirecionar automaticamente, volte para o app
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Se já está logado, não mostra nada (vai redirecionar)
-  if (user) {
-    return (
-      <div className={styles.container}>
-        <div style={{ color: '#fff', textAlign: 'center' }}>
-          Redirecionando...
         </div>
       </div>
     );
@@ -141,6 +124,21 @@ export default function Login() {
           textAlign: "center"
         }}>
           Erro: {error}
+          <br />
+          <button 
+            onClick={() => window.location.reload()}
+            style={{
+              marginTop: '10px',
+              padding: '5px 10px',
+              background: '#479b3d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '3px',
+              cursor: 'pointer'
+            }}
+          >
+            Tentar Novamente
+          </button>
         </div>
       )}
 
@@ -152,17 +150,24 @@ export default function Login() {
         {loginLoading ? "Entrando..." : "Entrar com Google"}
       </button>
 
-      {/* 🔧 CORREÇÃO: Mensagem específica para Safari */}
-      <div style={{
-        marginTop: '20px',
-        fontSize: '12px',
-        color: '#ccc',
-        textAlign: 'center'
-      }}>
-        {navigator.userAgent.toLowerCase().includes('safari') && 
-         !navigator.userAgent.toLowerCase().includes('chrome') && 
-         "No Safari, você será redirecionado para o login do Google"}
-      </div>
+      {/* 🔧 Instruções específicas para iPhone */}
+      {isIOS && (
+        <div style={{
+          marginTop: '20px',
+          fontSize: '12px',
+          color: '#ccc',
+          textAlign: 'center',
+          maxWidth: '300px',
+          background: 'rgba(255,255,255,0.1)',
+          padding: '10px',
+          borderRadius: '5px'
+        }}>
+          📱 <strong>Para iPhone:</strong><br/>
+          • Você será redirecionado para o Google<br/>
+          • Após login, volte automaticamente para o app<br/>
+          • Se travar, feche e abra o app novamente
+        </div>
+      )}
     </div>
   );
 }
