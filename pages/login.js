@@ -9,20 +9,29 @@ export default function Login() {
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged((u) => {
-      setUser(u);
-      setCheckingAuth(false);
-      if (u) {
-        router.replace("/home");
+    const unsub = auth.onAuthStateChanged(
+      (u) => {
+        setUser(u);
+        setCheckingAuth(false);
+        if (u) {
+          router.replace("/home");
+        }
+      },
+      (err) => {
+        setCheckingAuth(false);
+        setError(err?.message || "Erro desconhecido na autenticação");
+        console.error("onAuthStateChanged ERROR:", err);
       }
-    });
+    );
     return unsub;
   }, [router]);
 
   const dologin = async () => {
     setLoginLoading(true);
+    setError("");
     try {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
       if (isIOS) {
@@ -31,13 +40,20 @@ export default function Login() {
         await signInWithPopup(auth, provider);
       }
     } catch (err) {
-      alert("Erro ao logar");
+      setError(err?.message || "Erro ao logar");
       setLoginLoading(false);
+      console.error("LOGIN ERROR:", err);
     }
   };
 
-  // Loading enquanto verifica autenticação
-  if (checkingAuth) return <div className={styles.container}>Carregando...</div>;
+  if (checkingAuth)
+    return (
+      <div className={styles.container}>
+        <h1 className={styles.title}>PaceMatch</h1>
+        <p className={styles.subtitle}>Conecte. Combine. Corra junto.</p>
+        <div style={{marginTop: 20}}>Carregando...</div>
+      </div>
+    );
   // Se logado, não mostra login (protegido via .replace)
   if (user) return null;
 
@@ -45,6 +61,11 @@ export default function Login() {
     <div className={styles.container}>
       <h1 className={styles.title}>PaceMatch</h1>
       <p className={styles.subtitle}>Conecte. Combine. Corra junto.</p>
+      {error && (
+        <div style={{color:"red",marginBottom:12}}>
+          Erro: {error}
+        </div>
+      )}
       <button
         className={styles.loginButton}
         onClick={dologin}
