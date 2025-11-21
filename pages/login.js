@@ -1,5 +1,5 @@
 import { auth, provider } from "../firebase";
-import { signInWithPopup } from "firebase/auth";
+import { signInWithPopup, signInWithRedirect } from "firebase/auth";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import styles from "../styles/Login.module.css";
@@ -13,13 +13,18 @@ export default function Login() {
     }
   }, [router]);
 
-  const login = async () => {
+  const dologin = async () => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     try {
-      await signInWithPopup(auth, provider);
-      router.push("/home");
-    } catch (err) {
-      console.log(err);
-      alert("Erro ao logar");
+      if (isIOS) {
+        await signInWithRedirect(auth, provider);
+      } else {
+        await signInWithPopup(auth, provider);
+      }
+    }
+      catch (err) {
+        console.log(err);
+        alert("Erro ao logar");
     }
   };
 
