@@ -1,7 +1,8 @@
+// pages/login.js - VERSÃO DEFINITIVA PARA IPHONE
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { auth, provider } from "../firebase";
-import { signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged } from "firebase/auth";
+import { signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import styles from "../styles/Login.module.css";
 
 export default function Login() {
@@ -11,98 +12,117 @@ export default function Login() {
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
-    // 🔧 DETECTAR iOS
-    const userAgent = navigator.userAgent;
-    const isIOSDevice = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+    // 🔧 DETECTAR iOS CORRETAMENTE
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
     setIsIOS(isIOSDevice);
     
-    console.log("User Agent:", userAgent);
-    console.log("isIOS:", isIOSDevice);
+    console.log("📱 Dispositivo iOS:", isIOSDevice);
+    console.log("👤 User Agent:", navigator.userAgent);
 
-    // 🔧 SOLUÇÃO PARA iPHONE: Gerenciamento de estado de auth simplificado
-    const unsub = onAuthStateChanged(auth, (user) => {
-      console.log("Auth State Changed - User:", user);
-      
-      if (user) {
-        console.log("Usuário logado, redirecionando para /home");
-        // Usar replace para evitar histórico de navegação problemático
-        router.replace("/home");
-      } else {
-        console.log("Nenhum usuário logado");
-      }
-    });
-
-    // 🔧 IMPORTANTE: No iOS, verificar se há resultado de redirect pendente
-    if (isIOSDevice) {
-      const checkRedirect = async () => {
-        try {
-          console.log("Verificando redirect result no iOS...");
-          const result = await getRedirectResult(auth);
-          if (result?.user) {
-            console.log("Redirect result encontrado:", result.user);
-            // O onAuthStateChanged vai capturar isso e redirecionar
-          }
-        } catch (err) {
-          console.error("Erro no redirect check:", err);
+    // 🔧 VERIFICAR REDIRECT RESULT (CRUCIAL PARA IPHONE)
+    const checkRedirect = async () => {
+      try {
+        console.log("🔄 Verificando resultado de redirect...");
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          console.log("✅ Login via redirect bem-sucedido!");
+          console.log("👤 Usuário:", result.user.email);
+          router.replace("/home");
+          return;
         }
-      };
-      checkRedirect();
-    }
+      } catch (redirectError) {
+        console.error("❌ Erro no redirect:", redirectError);
+      }
 
-    return unsub;
+      // 🔧 VERIFICAR SE JÁ ESTÁ LOGADO
+      const unsubscribe = auth.onAuthStateChanged((user) => {
+        console.log("🔍 Estado da autenticação:", user ? `Logado (${user.email})` : "Não logado");
+        
+        if (user) {
+          console.log("✅ Usuário já logado, redirecionando para /home");
+          router.replace("/home");
+        }
+      });
+
+      return unsubscribe;
+    };
+
+    checkRedirect();
   }, [router]);
 
-  const doLogin = async () => {
+  const handleLogin = async () => {
     setLoginLoading(true);
     setError("");
-    
-    try {
-      console.log("Iniciando login... isIOS:", isIOS);
 
-      // 🔧 ESTRATÉGIA DIFERENCIADA PARA iOS
+    try {
+      console.log("🚀 Iniciando processo de login...");
+      console.log("📱 É iOS?", isIOS);
+
       if (isIOS) {
-        console.log("Usando signInWithRedirect para iOS");
-        
-        // IMPORTANTE: No iOS, usar redirect é mais confiável
+        // 🔥 IPHONE: SEMPRE USAR REDIRECT
+        console.log("📱 Usando signInWithRedirect para iPhone");
         await signInWithRedirect(auth, provider);
-        
-        // Não setar loading false - o app vai recarregar
-        return;
+        // ⚠️ NÃO CHAME setLoginLoading(false) AQUI!
+        // O app vai ser redirecionado e recarregado
       } else {
-        console.log("Usando signInWithPopup para outros dispositivos");
+        // 💻 OUTROS DISPOSITIVOS: USAR POPUP
+        console.log("💻 Usando signInWithPopup para outros dispositivos");
         const result = await signInWithPopup(auth, provider);
-        console.log("Login popup success:", result.user);
-        
-        // No popup, podemos setar loading como false
+        console.log("✅ Login popup bem-sucedido:", result.user.email);
         setLoginLoading(false);
-        
-        // O onAuthStateChanged vai capturar a mudança e redirecionar
+        // O onAuthStateChanged vai redirecionar automaticamente
       }
-    } catch (err) {
-      console.error("ERRO NO LOGIN:", err);
-      setError(err?.message || "Erro ao fazer login");
+    } catch (error) {
+      console.error("❌ Erro durante o login:", error);
+      console.error("🔍 Código do erro:", error.code);
+      console.error("🔍 Mensagem do erro:", error.message);
+      
+      setError(getErrorMessage(error));
       setLoginLoading(false);
     }
   };
 
-  // 🔧 Loading específico para iOS
+  // 🔧 TRADUZIR ERROS DO FIREBASE
+  const getErrorMessage = (error) => {
+    const errorCode = error.code;
+    
+    switch (errorCode) {
+      case 'auth/popup-blocked':
+        return 'Pop-up bloqueado! Permita pop-ups para este site.';
+      case 'auth/popup-closed-by-user':
+        return 'Login cancelado. Feche a janela?';
+      case 'auth/network-request-failed':
+        return 'Erro de conexão. Verifique sua internet.';
+      case 'auth/too-many-requests':
+        return 'Muitas tentativas. Tente novamente mais tarde.';
+      default:
+        return error.message || 'Erro desconhecido ao fazer login';
+    }
+  };
+
+  // 🔧 LOADING ESPECÍFICO PARA IPHONE
   if (loginLoading && isIOS) {
     return (
       <div className={styles.container}>
         <h1 className={styles.title}>PaceMatch</h1>
         <p className={styles.subtitle}>Conecte. Combine. Corra junto.</p>
         <div style={{ 
-          marginTop: 20, 
+          marginTop: 40, 
           color: '#fff',
-          textAlign: 'center'
+          textAlign: 'center',
+          padding: '30px'
         }}>
-          <div>🔗 Redirecionando para login...</div>
+          <div style={{ fontSize: '24px', marginBottom: '15px' }}>🔗</div>
+          <div style={{ fontSize: '18px', marginBottom: '10px' }}>Redirecionando...</div>
           <div style={{ 
-            fontSize: '12px', 
+            fontSize: '14px', 
             color: '#ccc',
-            marginTop: '10px'
+            marginTop: '15px',
+            lineHeight: '1.5'
           }}>
-            Se não redirecionar automaticamente, volte para o app
+            Você está sendo redirecionado para o Google.<br/>
+            Aguarde o processo automático.
           </div>
         </div>
       </div>
@@ -116,57 +136,108 @@ export default function Login() {
       
       {error && (
         <div style={{
-          color: "red", 
-          marginBottom: 12,
-          padding: "10px",
-          background: "rgba(255,0,0,0.1)",
-          borderRadius: "5px",
-          textAlign: "center"
+          color: "#ff6b6b", 
+          marginBottom: 20,
+          padding: "15px",
+          background: "rgba(255,107,107,0.1)",
+          borderRadius: "10px",
+          textAlign: "center",
+          border: "1px solid rgba(255,107,107,0.3)"
         }}>
-          Erro: {error}
+          <strong>Erro:</strong> {error}
           <br />
-          <button 
-            onClick={() => window.location.reload()}
-            style={{
-              marginTop: '10px',
-              padding: '5px 10px',
-              background: '#479b3d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '3px',
-              cursor: 'pointer'
-            }}
-          >
-            Tentar Novamente
-          </button>
+          <div style={{ marginTop: '12px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <button 
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '8px 16px',
+                background: '#479b3d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              🔄 Recarregar
+            </button>
+            <button 
+              onClick={() => setError("")}
+              style={{
+                padding: '8px 16px',
+                background: '#666',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              ✕ Limpar
+            </button>
+          </div>
         </div>
       )}
 
       <button
         className={styles.loginButton}
-        onClick={doLogin}
+        onClick={handleLogin}
         disabled={loginLoading}
+        style={{
+          opacity: loginLoading ? 0.7 : 1,
+          cursor: loginLoading ? 'not-allowed' : 'pointer'
+        }}
       >
-        {loginLoading ? "Entrando..." : "Entrar com Google"}
+        {loginLoading ? (
+          <span>⏳ Entrando...</span>
+        ) : (
+          <span>🚀 Entrar com Google</span>
+        )}
       </button>
 
-      {/* 🔧 Instruções específicas para iPhone */}
-      {isIOS && (
+      {/* 🔧 INFORMAÇÕES ESPECÍFICAS PARA IPHONE */}
+      {isIOS && !loginLoading && (
         <div style={{
-          marginTop: '20px',
-          fontSize: '12px',
-          color: '#ccc',
+          marginTop: '25px',
+          fontSize: '13px',
+          color: '#ddd',
           textAlign: 'center',
-          maxWidth: '300px',
-          background: 'rgba(255,255,255,0.1)',
-          padding: '10px',
-          borderRadius: '5px'
+          maxWidth: '320px',
+          background: 'rgba(255,255,255,0.05)',
+          padding: '15px',
+          borderRadius: '8px',
+          lineHeight: '1.5'
         }}>
-          📱 <strong>Para iPhone:</strong><br/>
+          <div style={{ fontSize: '15px', marginBottom: '8px', fontWeight: 'bold' }}>📱 Instruções para iPhone</div>
           • Você será redirecionado para o Google<br/>
-          • Após login, volte automaticamente para o app<br/>
-          • Se travar, feche e abra o app novamente
+          • Faça seu login normalmente<br/>
+          • <strong>Permita o redirecionamento</strong> de volta para o app<br/>
+          • O processo é automático após o login
         </div>
+      )}
+
+      {/* 🔧 BOTÃO DE DEBUG - APENAS PARA DESENVOLVIMENTO */}
+      {process.env.NODE_ENV === 'development' && (
+        <button
+          onClick={() => {
+            console.log("🐛 DEBUG INFO:");
+            console.log("User Agent:", navigator.userAgent);
+            console.log("isIOS:", isIOS);
+            console.log("Auth Current User:", auth.currentUser);
+          }}
+          style={{
+            marginTop: '15px',
+            padding: '5px 10px',
+            background: 'transparent',
+            color: '#666',
+            border: '1px solid #666',
+            borderRadius: '4px',
+            fontSize: '10px',
+            cursor: 'pointer'
+          }}
+        >
+          🐛 Debug Info
+        </button>
       )}
     </div>
   );
