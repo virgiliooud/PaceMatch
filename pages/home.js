@@ -100,7 +100,7 @@ export default function HomePage() {
       <h2 className={styles.greeting}>Olá, {user.displayName?.split(" ")[0]} 👟</h2>
       <p className={styles.subText}>Veja os treinos disponíveis:</p>
 
-      {/* NOVOS FILTROS: cidade, pace, público/privado, nome */}
+      {/* FILTROS */}
       <div className={styles.filtros}>
         <select
           value={cidadeFiltro}
@@ -190,12 +190,15 @@ export default function HomePage() {
             >
               Ver Treino
             </button>
-            <button
-              onClick={() => router.push(`/workoutChats/${workout.id}`)}
-              className={styles.chatButton}
-            >
-              💬 Chat
-            </button>
+            {/* Botão do chat aparece somente para participantes */}
+            {user && workout.participants?.includes(user.uid) && (
+              <button
+                onClick={() => router.push(`/workoutChats/${workout.id}`)}
+                className={styles.chatButton}
+              >
+                💬 Chat
+              </button>
+            )}
           </div>
         </div>
       ))}
