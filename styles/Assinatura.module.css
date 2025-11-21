@@ -56,35 +56,6 @@
   line-height: 1.6;
 }
 
-.heroStats {
-  display: flex;
-  justify-content: center;
-  gap: 60px;
-  flex-wrap: wrap;
-}
-
-.stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.statNumber {
-  font-size: 2.5rem;
-  font-weight: 800;
-  background: linear-gradient(45deg, #00c6ff, #0072ff);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 8px;
-}
-
-.statLabel {
-  color: #ccc;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
 /* Plans Section */
 .plansSection {
   padding: 80px 20px;
@@ -414,14 +385,6 @@
   
   .card.featured:hover {
     transform: translateY(-10px);
-  }
-  
-  .heroStats {
-    gap: 30px;
-  }
-  
-  .statNumber {
-    font-size: 2rem;
   }
 }
 

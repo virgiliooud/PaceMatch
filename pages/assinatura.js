@@ -46,20 +46,6 @@ export default function Assinatura() {
             Junte-se à comunidade de corredores mais motivada do Brasil. 
             <br />Treinos ilimitados, conexões reais e resultados extraordinários.
           </p>
-          <div className={styles.heroStats}>
-            <div className={styles.stat}>
-              <span className={styles.statNumber}>+2K</span>
-              <span className={styles.statLabel}>Corredores Ativos</span>
-            </div>
-            <div className={styles.stat}>
-              <span className={styles.statNumber}>+15K</span>
-              <span className={styles.statLabel}>Treinos Realizados</span>
-            </div>
-            <div className={styles.stat}>
-              <span className={styles.statNumber}>98%</span>
-              <span className={styles.statLabel}>Satisfação</span>
-            </div>
-          </div>
         </div>
       </div>
 
