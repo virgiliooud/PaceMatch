@@ -21,10 +21,9 @@ export default function Login() {
       } else {
         await signInWithPopup(auth, provider);
       }
-    }
-      catch (err) {
-        console.log(err);
-        alert("Erro ao logar");
+    } catch (err) {
+      console.log(err);
+      alert("Erro ao logar");
     }
   };
 
@@ -33,7 +32,7 @@ export default function Login() {
       <h1 className={styles.title}>PaceMatch</h1>
       <p className={styles.subtitle}>Conecte. Combine. Corra junto.</p>
 
-      <button className={styles.loginButton} onClick={login}>
+      <button className={styles.loginButton} onClick={dologin}>
         Entrar com Google
       </button>
     </div>
