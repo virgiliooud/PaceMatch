@@ -6,17 +6,28 @@ import { useRouter } from "next/router";
 import styles from "../styles/HomePage.module.css";
 
 const cidades = [
-  "São Paulo", "Rio de Janeiro", "Belo Horizonte",
-  "Curitiba", "Porto Alegre", "Brasília",
-  "Recife", "Fortaleza", "Salvador", "Manaus", "Florianópolis e região"
+  "São Paulo",
+  "Rio de Janeiro",
+  "Belo Horizonte",
+  "Curitiba",
+  "Porto Alegre",
+  "Brasília",
+  "Recife",
+  "Fortaleza",
+  "Salvador",
+  "Manaus",
+  "Florianópolis e região",
 ];
 
 export default function HomePage() {
   const [user, setUser] = useState(null);
   const [userPlano, setUserPlano] = useState("basic");
   const [workouts, setWorkouts] = useState([]);
+
   const [cidadeFiltro, setCidadeFiltro] = useState("");
   const [paceFiltro, setPaceFiltro] = useState("");
+  const [publicoPrivadoFiltro, setPublicoPrivadoFiltro] = useState("todos");
+  const [nomeFiltro, setNomeFiltro] = useState("");
 
   const router = useRouter();
 
@@ -47,6 +58,9 @@ export default function HomePage() {
     }
     if (cidadeFiltro && w.location !== cidadeFiltro) return false;
     if (paceFiltro && !w.pace.toLowerCase().includes(paceFiltro.toLowerCase())) return false;
+    if (publicoPrivadoFiltro === "publico" && w.isPrivate) return false;
+    if (publicoPrivadoFiltro === "privado" && !w.isPrivate) return false;
+    if (nomeFiltro && !w.name.toLowerCase().includes(nomeFiltro.toLowerCase())) return false;
     return true;
   });
 
@@ -67,6 +81,7 @@ export default function HomePage() {
         <img src="/logo.png" alt="PaceMatch Logo" className={styles.logo} />
       </div>
 
+      {/* Top bar */}
       <div className={styles.topBar} style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <img
           src={user?.photoURL}
@@ -85,7 +100,7 @@ export default function HomePage() {
       <h2 className={styles.greeting}>Olá, {user.displayName?.split(" ")[0]} 👟</h2>
       <p className={styles.subText}>Veja os treinos disponíveis:</p>
 
-      {/* FILTROS */}
+      {/* NOVOS FILTROS: cidade, pace, público/privado, nome */}
       <div className={styles.filtros}>
         <select
           value={cidadeFiltro}
@@ -94,7 +109,9 @@ export default function HomePage() {
         >
           <option value="">Filtrar por cidade</option>
           {cidades.map((cidade) => (
-            <option key={cidade} value={cidade}>{cidade}</option>
+            <option key={cidade} value={cidade}>
+              {cidade}
+            </option>
           ))}
         </select>
 
@@ -106,10 +123,31 @@ export default function HomePage() {
           className={styles.inputFiltro}
         />
 
+        <select
+          value={publicoPrivadoFiltro}
+          onChange={(e) => setPublicoPrivadoFiltro(e.target.value)}
+          className={styles.selectFiltro}
+        >
+          <option value="todos">Todos</option>
+          <option value="publico">Público</option>
+          <option value="privado">Privado</option>
+        </select>
+
+        <input
+          type="text"
+          placeholder="Buscar por nome do treino"
+          value={nomeFiltro}
+          onChange={(e) => setNomeFiltro(e.target.value)}
+          className={styles.inputFiltro}
+          style={{ width: "auto", flexGrow: 1 }}
+        />
+
         <button
           onClick={() => {
             setCidadeFiltro("");
             setPaceFiltro("");
+            setPublicoPrivadoFiltro("todos");
+            setNomeFiltro("");
           }}
           className={styles.botaoLimparFiltro}
         >
@@ -128,15 +166,23 @@ export default function HomePage() {
 
       {workoutsValidos.map((workout) => (
         <div key={workout.id} className={styles.card}>
-          <h3>{workout.name}</h3>
+          <h3>
+            {workout.name}{" "}
+            {workout.isPrivate && (
+              <span title="Treino Privado" style={{ marginLeft: 8 }}>
+                🔒
+              </span>
+            )}
+          </h3>
           <p>Tipo: {workout.type}</p>
           <p>Pace: {workout.pace}</p>
           <p>Local: {workout.location}</p>
           <p>Horário: {workout.time}</p>
           <p>Data: {workout.date ? new Date(workout.date).toLocaleDateString() : ""}</p>
-          <p className="participants">
-            Participantes: {workout.participants?.length || 0}
+          <p>
+            <b>{workout.isPrivate ? "Privado" : "Público"}</b>
           </p>
+          <p className="participants">Participantes: {workout.participants?.length || 0}</p>
           <div className={styles.cardButtons}>
             <button
               onClick={() => router.push(`/workout/${workout.id}`)}

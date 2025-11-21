@@ -33,6 +33,11 @@ export default function WorkoutPage() {
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [styledRoute, setStyledRoute] = useState(null);
 
+  // Estado da senha para treino privado
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [inputPassword, setInputPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+
   const ORS_API_KEY =
     "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijk2MjE3OWE5YjI3MjRlMzVhNWYxNGU2MTNjMjJkNWNhIiwiaCI6Im11cm11cjY0In0=";
 
@@ -82,7 +87,7 @@ export default function WorkoutPage() {
           setStyledRoute(null);
         }
       }
-      
+
       if (data.participants.length > 0) {
         loadParticipantsNames(data.participants);
       } else {
@@ -104,6 +109,24 @@ export default function WorkoutPage() {
       });
     }
     setParticipants(list);
+  };
+
+  // Atualizado: função para tentar entrar, validando senha se for treino privado
+  const tryJoinWorkout = async () => {
+    if (!user || !workout) return;
+
+    // Se treino privado e usuário NÃO está participando
+    if (
+      workout.isPrivate &&
+      !workout.participants.includes(user.uid)
+    ) {
+      setPasswordError(""); // limpa erro
+      setShowPasswordModal(true);
+      return;
+    }
+
+    // Se não é privado ou usuário já participa, entra direto
+    await joinWorkout();
   };
 
   const joinWorkout = async () => {
@@ -153,6 +176,9 @@ export default function WorkoutPage() {
     const newList = [...(workout.participants || []), user.uid];
     setWorkout({ ...workout, participants: newList });
     loadParticipantsNames(newList);
+    setShowPasswordModal(false);
+    setInputPassword("");
+    setPasswordError("");
   };
 
   const leaveWorkout = async () => {
@@ -169,6 +195,18 @@ export default function WorkoutPage() {
       ...workout,
       participants: workout.participants.filter((p) => p !== user.uid),
     });
+  };
+
+  // Validação de senha do modal
+  const handlePasswordSubmit = async () => {
+    if (inputPassword === workout.password) {
+      await joinWorkout();
+      setShowPasswordModal(false);
+      setInputPassword("");
+      setPasswordError("");
+    } else {
+      setPasswordError("Senha incorreta. Tente novamente.");
+    }
   };
 
   if (!workout) return <p className={styles.empty}>Carregando treino...</p>;
@@ -200,7 +238,7 @@ export default function WorkoutPage() {
         )}
       </div>
 
-      {/* MAPA: passa rota "bonitinha" se existir, senão a rota original */}
+      {/* MAPA: rota bonitinha ou original */}
       {styledRoute ? (
         <WorkoutMap route={styledRoute} showWaypoints={false} />
       ) : workout.route && workout.route.length > 0 ? (
@@ -219,7 +257,7 @@ export default function WorkoutPage() {
       ) : (
         <button
           className={`${styles.button} ${styles.join}`}
-          onClick={joinWorkout}
+          onClick={tryJoinWorkout} // Agora chama aqui a validação de senha
         >
           Participar
         </button>
@@ -263,6 +301,40 @@ export default function WorkoutPage() {
               onClick={() => setShowLimitModal(false)}
             >
               Fechar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de senha para treino privado */}
+      {showPasswordModal && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h2>Treino Privado</h2>
+            <p>Este treino é privado. Por favor, insira a senha para participar.</p>
+            <input
+              type="password"
+              value={inputPassword}
+              onChange={(e) => setInputPassword(e.target.value)}
+              style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
+              autoFocus
+            />
+            {passwordError && (
+              <p style={{ color: "red", marginBottom: "10px" }}>{passwordError}</p>
+            )}
+            <button className={styles.assinarBtn} onClick={handlePasswordSubmit}>
+              Confirmar
+            </button>
+            <button
+              className={styles.fecharBtn}
+              onClick={() => {
+                setShowPasswordModal(false);
+                setInputPassword("");
+                setPasswordError("");
+              }}
+              style={{ marginLeft: "10px" }}
+            >
+              Cancelar
             </button>
           </div>
         </div>
