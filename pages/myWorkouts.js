@@ -8,6 +8,8 @@ import { useRouter } from "next/router";
 export default function MyWorkouts() {
   const [user, setUser] = useState(null);
   const [myWorkouts, setMyWorkouts] = useState([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [trainingToDelete, setTrainingToDelete] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -35,16 +37,30 @@ export default function MyWorkouts() {
     return unsub;
   }, [user]);
 
-  const handleDelete = async (id) => {
-    const confirm = window.confirm("Tem certeza que deseja deletar este treino? Essa ação não pode ser desfeita.");
-    if (!confirm) return;
+  const handleDeleteClick = (id) => {
+    setTrainingToDelete(id);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!trainingToDelete) return;
 
     try {
-      await deleteDoc(doc(db, "workouts", id));
-      alert("Treino deletado com sucesso!");
+      await deleteDoc(doc(db, "workouts", trainingToDelete));
+      // Remove os alerts nativos que não funcionam no iPhone
+      // Você pode adicionar um toast ou feedback visual depois
+      setShowDeleteModal(false);
+      setTrainingToDelete(null);
     } catch (error) {
-      alert("Erro ao deletar treino: " + error.message);
+      console.error("Erro ao deletar treino: ", error);
+      setShowDeleteModal(false);
+      setTrainingToDelete(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setTrainingToDelete(null);
   };
 
   if (!user)
@@ -59,6 +75,32 @@ export default function MyWorkouts() {
 
   return (
     <div className={styles.container}>
+      {/* Modal de Confirmação */}
+      {showDeleteModal && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h3 className={styles.modalTitle}>Deletar Treino?</h3>
+            <p className={styles.modalText}>
+              Tem certeza que quer deletar esse treino? Essa porra não tem volta!
+            </p>
+            <div className={styles.modalButtons}>
+              <button
+                onClick={cancelDelete}
+                className={styles.cancelButton}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                className={styles.confirmDeleteButton}
+              >
+                Deletar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Link href="/home" className={styles.backLink}>
         ← Voltar à Home
       </Link>
@@ -87,7 +129,7 @@ export default function MyWorkouts() {
             {workout.creatorId === user.uid && (
               <button
                 className={styles.deleteButton}
-                onClick={() => handleDelete(workout.id)}
+                onClick={() => handleDeleteClick(workout.id)}
               >
                 Deletar
               </button>
