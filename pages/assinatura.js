@@ -73,7 +73,7 @@ export default function Assinatura() {
         {/* Caixa de Checkout Teste */}
         <div className={`${styles.card} ${styles.teste}`}>
           <h2 className={styles.cardTitulo}>Teste Stripe</h2>
-          <p className={styles.price}>R$ 0,20 (para testar)</p>
+          <p className={styles.price}>R$ 0,10 (para testar)</p>
           <ul className={styles.features}>
             <li>Compra de teste integrando o Stripe</li>
             <li>Ideal para conferir o funcionamento</li>
