@@ -65,14 +65,6 @@ export default function HomePage() {
         (snapshot) => {
           const list = snapshot.docs.map((doc) => {
             const data = doc.data();
-            console.log("📥 Workout carregado:", {
-              id: doc.id,
-              name: data.name,
-              pace: data.pace,
-              paceMin: data.paceMin,
-              paceMax: data.paceMax,
-              location: data.location
-            });
             return { 
               id: doc.id, 
               ...data,
@@ -107,7 +99,7 @@ export default function HomePage() {
     return minutos * 60 + segundos;
   };
 
-  // ✅ FILTRO COM DEBUG DETALHADO
+  // ✅ FILTRO SEM DEBUG
   const workoutsValidos = workouts.filter((workout) => {
     if (!workout.name || workout.name.trim() === "" || !workout.route || workout.route.length === 0) {
       return false;
@@ -115,20 +107,11 @@ export default function HomePage() {
 
     // Filtro de cidade
     if (cidadeFiltro && workout.location !== cidadeFiltro) {
-      console.log(`📍 Filtrado por cidade: ${workout.name} - ${workout.location} !== ${cidadeFiltro}`);
       return false;
     }
 
-    // ✅ FILTRO DE PACE COM DEBUG DETALHADO
+    // ✅ FILTRO DE PACE
     if (paceFiltro) {
-      console.log(" ");
-      console.log("🔍 FILTRO PACE ANALISANDO:", workout.name);
-      console.log("   📊 Dados do workout:");
-      console.log("   - pace:", workout.pace);
-      console.log("   - paceMin:", workout.paceMin);
-      console.log("   - paceMax:", workout.paceMax);
-      console.log("   🎯 Filtro selecionado:", paceFiltro);
-      
       let passouNoFiltro = false;
       
       // Primeiro tenta usar paceMin e paceMax se existirem
@@ -137,13 +120,7 @@ export default function HomePage() {
         const workoutMinSegundos = convertPaceToSeconds(workout.paceMin);
         const workoutMaxSegundos = convertPaceToSeconds(workout.paceMax);
         
-        console.log("   ⏱️ Conversão para segundos:");
-        console.log("   - Filtro:", paceFiltro, "→", paceFiltroSegundos, "segundos");
-        console.log("   - Min:", workout.paceMin, "→", workoutMinSegundos, "segundos");
-        console.log("   - Max:", workout.paceMax, "→", workoutMaxSegundos, "segundos");
-        
         const estaDentroIntervalo = paceFiltroSegundos >= workoutMinSegundos && paceFiltroSegundos <= workoutMaxSegundos;
-        console.log("   ✅ Está dentro do intervalo?", estaDentroIntervalo);
         
         if (estaDentroIntervalo) {
           passouNoFiltro = true;
@@ -152,41 +129,30 @@ export default function HomePage() {
       
       // Se não passou pelo primeiro método, tenta fallback na string do pace
       if (!passouNoFiltro && workout.pace) {
-        console.log("   🔄 Tentando fallback na string do pace...");
         // Fallback simples: verifica se o pace filtro aparece em algum lugar do pace string
         if (workout.pace.includes(paceFiltro)) {
-          console.log("   ✅ Fallback: Pace encontrado na string");
           passouNoFiltro = true;
-        } else {
-          console.log("   ❌ Fallback: Pace NÃO encontrado na string");
         }
       }
       
       if (!passouNoFiltro) {
-        console.log("   🚫 WORKOUT FILTRADO FORA - Não passou no filtro de pace");
         return false;
       }
-      
-      console.log("   ✅ WORKOUT MANTIDO - Passou no filtro de pace");
     }
 
     // Filtro público/privado
     if (publicoPrivadoFiltro === "publico" && workout.isPrivate) {
-      console.log(`🔒 Filtrado por público/privado: ${workout.name} - é privado`);
       return false;
     }
     if (publicoPrivadoFiltro === "privado" && !workout.isPrivate) {
-      console.log(`🔓 Filtrado por público/privado: ${workout.name} - é público`);
       return false;
     }
 
     // Filtro por nome
     if (nomeFiltro && !workout.name.toLowerCase().includes(nomeFiltro.toLowerCase())) {
-      console.log(`📝 Filtrado por nome: ${workout.name} não contém ${nomeFiltro}`);
       return false;
     }
     
-    console.log(`🎯 WORKOUT ACEITO: ${workout.name}`);
     return true;
   });
 
@@ -235,21 +201,6 @@ export default function HomePage() {
 
   return (
     <div className={styles.container}>
-      {/* DEBUG INFO */}
-      <div style={{
-        background: '#1a1a1a',
-        color: '#00ff00',
-        padding: '10px',
-        borderRadius: '8px',
-        marginBottom: '20px',
-        fontSize: '12px',
-        border: '1px solid #333'
-      }}>
-        <strong>🔧 DEBUG:</strong> Treinos carregados: {workouts.length} | Filtrados: {workoutsValidos.length} | Pace selecionado: {paceFiltro || "Nenhum"}
-        <br />
-        <small>Abra o console (F12) para ver detalhes do filtro</small>
-      </div>
-
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.logoContainer}>
