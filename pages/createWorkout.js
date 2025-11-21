@@ -1,368 +1,598 @@
 import { useState, useEffect } from "react";
+import { auth, db } from "../firebase";
+import {
+  collection,
+  addDoc,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+  Timestamp,
+} from "firebase/firestore";
 import { useRouter } from "next/router";
-import { db, auth } from "../firebase";
-import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import styles from "../styles/CreateWorkout.module.css";
+import dynamic from 'next/dynamic';
+
+const MapCreator = dynamic(() => import("../components/MapCreator"), {
+  ssr: false,
+  loading: () => (
+    <div style={{ 
+      height: "350px", 
+      width: "100%", 
+      background: "#333", 
+      display: "flex", 
+      alignItems: "center", 
+      justifyContent: "center",
+      color: "#fff",
+      borderRadius: "8px",
+      marginBottom: "20px"
+    }}>
+      Carregando mapa...
+    </div>
+  )
+});
 
 const cidades = [
   "São Paulo",
-  "Rio de Janeiro", 
+  "Rio de Janeiro",
+  "Florianópolis e região",
   "Belo Horizonte",
   "Curitiba",
   "Porto Alegre",
   "Brasília",
   "Recife",
   "Fortaleza",
-  "Salvador", 
-  "Manaus",
-  "Florianópolis e região",
+  "Salvador",
 ];
 
-const paceOptions = [
-  "2:30", "2:45", "3:00", "3:15", "3:30", "3:45", "4:00", "4:15", "4:30", "4:45",
-  "5:00", "5:15", "5:30", "5:45", "6:00", "6:15", "6:30", "6:45", "7:00", "7:15",
-  "7:30", "7:45", "8:00", "8:15", "8:30", "8:45", "9:00", "9:15", "9:30", "9:45", "10:00"
-];
+const generatePaceOptions = () => {
+  const options = [];
+  for (let min = 2; min <= 10; min++) {
+    for (let sec = (min === 2 ? 30 : 0); sec < 60; sec += 15) {
+      if (min === 10 && sec > 0) break;
+      const paceValue = `${min}:${sec.toString().padStart(2, '0')}`;
+      options.push(paceValue);
+    }
+  }
+  return options;
+};
+
+const paceOptions = generatePaceOptions();
 
 export default function CreateWorkout() {
-  const router = useRouter();
   const [user, setUser] = useState(null);
-  const [userPlano, setUserPlano] = useState("basic");
-  const [loading, setLoading] = useState(false);
+  const [name, setName] = useState("");
+  const [type, setType] = useState("");
+  const [paceMin, setPaceMin] = useState("");
+  const [paceMax, setPaceMax] = useState("");
+  const [location, setLocation] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [route, setRoute] = useState([]);
+  const [distance, setDistance] = useState(0);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [password, setPassword] = useState("");
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [routeMethod, setRouteMethod] = useState("map");
+  const [customDistance, setCustomDistance] = useState("");
 
-  // Estados do formulário
-  const [formData, setFormData] = useState({
-    name: "",
-    type: "running",
-    location: "",
-    date: "",
-    time: "",
-    pace: "",
-    paceMin: "",
-    paceMax: "",
-    distance: "",
-    description: "",
-    isPrivate: false,
-    route: []
-  });
+  const router = useRouter();
 
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged(async (u) => {
-      setUser(u);
-      if (u) {
-        try {
-          const userDoc = await getDoc(doc(db, "users", u.uid));
-          const plano = userDoc.exists() ? userDoc.data().plano || "basic" : "basic";
-          setUserPlano(plano);
-        } catch (error) {
-          console.error("Erro ao buscar plano:", error);
-        }
-      } else {
-        router.push("/login");
+    const unsub = auth.onAuthStateChanged((u) => setUser(u));
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (name || type || paceMin || paceMax || location || date || time || route.length > 0 || customDistance) {
+      setHasUnsavedChanges(true);
+    } else {
+      setHasUnsavedChanges(false);
+    }
+  }, [name, type, paceMin, paceMax, location, date, time, route, customDistance]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'Tem certeza que quer sair? Seus dados serão perdidos!';
+        return 'Tem certeza que quer sair? Seus dados serão perdidos!';
       }
-    });
-    return unsub;
-  }, [router]);
+    };
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value
-    }));
+    const handleRouteChange = (url) => {
+      if (hasUnsavedChanges && url !== router.asPath) {
+        setShowExitConfirm(true);
+        router.events.emit('routeChangeError');
+        throw 'Route change aborted.';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    router.events.on('routeChangeStart', handleRouteChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      router.events.off('routeChangeStart', handleRouteChange);
+    };
+  }, [hasUnsavedChanges, router]);
+
+  const handleBackClick = () => {
+    if (hasUnsavedChanges) {
+      setShowExitConfirm(true);
+    } else {
+      router.back();
+    }
   };
 
-  const handlePaceChange = (e) => {
-    const paceValue = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      pace: paceValue,
-      // Define min e max automaticamente baseado no pace selecionado
-      paceMin: paceValue,
-      paceMax: paceValue
-    }));
+  const confirmExit = () => {
+    setShowExitConfirm(false);
+    setHasUnsavedChanges(false);
+    router.back();
   };
 
-  const handleSubmit = async (e) => {
+  const cancelExit = () => {
+    setShowExitConfirm(false);
+  };
+
+  useEffect(() => {
+    if (routeMethod === "distance") {
+      setRoute(prev => prev.length > 1 ? [prev[0]] : prev);
+      setDistance(0);
+    }
+  }, [routeMethod]);
+
+  const handleMapClick = (waypoints, dist) => {
+    if (routeMethod === "distance") {
+      if (waypoints.length > 0) {
+        setRoute([waypoints[0]]);
+        setDistance(0);
+      }
+    } else {
+      setRoute(waypoints);
+      setDistance(dist || 0);
+    }
+  };
+
+  async function handleSubmit(e) {
     e.preventDefault();
+    
+    console.log("🚀 INICIANDO CRIAÇÃO DE TREINO...");
+    
     if (!user) {
-      alert("Você precisa estar logado para criar um treino!");
+      alert("❌ Você precisa estar logado!");
       return;
     }
 
-    // Validações básicas
-    if (!formData.name.trim()) {
-      alert("Por favor, insira um nome para o treino!");
+    console.log("✅ Usuário logado:", user.uid, user.email);
+
+    if (isPrivate && password.trim().length < 4) {
+      alert("Para criar um treino privado, informe uma senha com pelo menos 4 caracteres.");
       return;
     }
 
-    if (!formData.location) {
-      alert("Por favor, selecione uma cidade!");
+    if (!paceMin || !paceMax) {
+      alert("Selecione o intervalo de pace!");
       return;
     }
 
-    if (!formData.date || !formData.time) {
-      alert("Por favor, insira data e hora do treino!");
+    if (routeMethod === "map" && route.length < 2) {
+      alert("Crie uma rota com pelo menos 2 pontos no mapa!");
       return;
     }
 
-    if (!formData.pace) {
-      alert("Por favor, selecione um pace!");
+    if (routeMethod === "distance" && (!customDistance || parseFloat(customDistance) <= 0)) {
+      alert("Informe uma distância válida!");
       return;
     }
 
-    setLoading(true);
+    if (routeMethod === "distance" && route.length === 0) {
+      alert("Marque o ponto de início no mapa!");
+      return;
+    }
+
+    console.log("🔍 DEBUG - Antes de salvar:");
+    console.log("User:", user);
+    console.log("User UID:", user?.uid);
+    console.log("Workout Data:", {
+      name, type, paceMin, paceMax, location, date, time,
+      routeLength: route.length,
+      distance, routeMethod, customDistance
+    });
+
+    const userRef = await getDoc(doc(db, "users", user.uid));
+    const plano = userRef.exists() ? userRef.data().plano || "basic" : "basic";
+
+    if (plano === "basic") {
+      const firstDay = new Date();
+      firstDay.setDate(1);
+      firstDay.setHours(0, 0, 0, 0);
+
+      const qCriados = query(
+        collection(db, "workouts"),
+        where("creatorId", "==", user.uid),
+        where("createdAt", ">=", Timestamp.fromDate(firstDay))
+      );
+      const qEntrou = query(
+        collection(db, "workouts"),
+        where("participants", "array-contains", user.uid),
+        where("createdAt", ">=", Timestamp.fromDate(firstDay))
+      );
+
+      const [criadosSnap, entrouSnap] = await Promise.all([
+        getDocs(qCriados),
+        getDocs(qEntrou),
+      ]);
+      const criadosIds = criadosSnap.docs.map((doc) => doc.id);
+      const entrouIds = entrouSnap.docs.map((doc) => doc.id);
+      const totalUnico = new Set([...criadosIds, ...entrouIds]).size;
+
+      if (totalUnico >= 3) {
+        setShowLimitModal(true);
+        return;
+      }
+    }
+
+    // ✅ Serializar os pontos da rota
+    const serializedRoute = route.map(point => ({
+      lat: Number(point.lat),
+      lng: Number(point.lng)
+    }));
+
+    const pointsToSave = routeMethod === "map" ? serializedRoute : [serializedRoute[0]];
+    const finalDistance = routeMethod === "map" ? distance : parseFloat(customDistance);
+
+    // ✅ Serializar o startPoint
+    const serializedStartPoint = route.length > 0 ? {
+      lat: Number(route[0].lat),
+      lng: Number(route[0].lng)
+    } : null;
+
+    if (!name || !type || !location || !date || !time) {
+      alert("Preencha todos os campos!");
+      return;
+    }
 
     try {
+      // ✅ Dados serializados CORRETAMENTE
       const workoutData = {
-        ...formData,
-        createdBy: user.uid,
-        createdByName: user.displayName || user.email,
-        createdAt: serverTimestamp(),
-        participants: [user.uid], // Criador é automaticamente participante
-        participantCount: 1
+        name: name.trim(),
+        type: type.trim(),
+        pace: `${paceMin} - ${paceMax}`,
+        paceMin: paceMin,
+        paceMax: paceMax,
+        location: location,
+        date: date,
+        time: time,
+        route: pointsToSave,
+        distance: Number(finalDistance.toFixed(2)),
+        routeMethod: routeMethod,
+        startPoint: routeMethod === "distance" ? serializedStartPoint : null,
+        participants: [user.uid],
+        creatorId: user.uid,
+        createdAt: Timestamp.now(),
+        isPrivate: isPrivate,
+        password: isPrivate ? password.trim() : null,
       };
 
+      console.log("📤 ENVIANDO PARA FIREBASE:");
+      console.log(JSON.stringify(workoutData, null, 2));
+
+      // ✅ Tenta salvar no Firebase
       const docRef = await addDoc(collection(db, "workouts"), workoutData);
       
-      console.log("✅ Treino criado com ID:", docRef.id);
-      alert("Treino criado com sucesso!");
-      router.push("/");
+      console.log("✅ TREINO CRIADO COM SUCESSO! ID:", docRef.id);
       
-    } catch (error) {
-      console.error("❌ Erro ao criar treino:", error);
-      alert("Erro ao criar treino. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
+      // ✅ Verifica se realmente foi salvo
+      const savedDoc = await getDoc(docRef);
+      if (savedDoc.exists()) {
+        console.log("✅ CONFIRMADO: Treino salvo no Firebase:", savedDoc.data());
+        alert("🎉 Treino criado com sucesso!");
+        setHasUnsavedChanges(false);
+        router.push("/home");
+      } else {
+        throw new Error("Treino não foi salvo no Firebase");
+      }
 
-  if (!user) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.loading}>
-          <p>Carregando...</p>
-        </div>
-      </div>
-    );
+    } catch (error) {
+      console.error("❌ ERRO CRÍTICO AO CRIAR TREINO:");
+      console.error("Código:", error.code);
+      console.error("Mensagem:", error.message);
+      console.error("Stack:", error.stack);
+      
+      alert(`Erro ao criar treino: ${error.message}`);
+    }
   }
 
   return (
     <div className={styles.container}>
-      {/* Header */}
-      <div className={styles.header}>
-        <button 
-          onClick={() => router.back()} 
-          className={styles.backButton}
-        >
-          ← Voltar
-        </button>
-        
-        <div className={styles.userSection}>
-          <img
-            src={user?.photoURL || "/default-avatar.png"}
-            alt="Foto"
-            className={styles.profileImg}
-          />
-          <div className={`${styles.planoBadge} ${userPlano === "premium" ? styles.premium : styles.basic}`}>
-            {userPlano === "premium" ? "⭐ Premium" : "🔹 Básico"}
+      {showExitConfirm && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h2>Sair sem salvar?</h2>
+            <p>Tem certeza que quer sair? Todo o treino não salvo será perdido!</p>
+            <div className={styles.modalButtons}>
+              <button className={styles.cancelButton} onClick={cancelExit}>
+                Cancelar
+              </button>
+              <button className={styles.confirmButton} onClick={confirmExit}>
+                Sair
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      <div className={styles.header}>
+        <button onClick={handleBackClick} className={styles.backButton}>
+          ← Voltar
+        </button>
+        <h1 className={styles.titulo}>Criar Novo Treino</h1>
       </div>
 
-      <div className={styles.content}>
-        <h1 className={styles.title}>🏃‍♂️ Criar Novo Treino</h1>
-        <p className={styles.subtitle}>Compartilhe seu treino e encontre parceiros</p>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>Nome do treino</label>
+          <input
+            className={styles.input}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </div>
 
-        <form onSubmit={handleSubmit} className={styles.form}>
-          {/* Nome do Treino */}
-          <div className={styles.formGroup}>
-            <label htmlFor="name" className={styles.label}>
-              Nome do Treino *
-            </label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              placeholder="Ex: Corrida no Parque, Treino Longo Domingo..."
-              className={styles.input}
-              required
-            />
-          </div>
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>Tipo</label>
+          <input
+            className={styles.input}
+            type="text"
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            required
+          />
+        </div>
 
-          {/* Tipo de Treino */}
-          <div className={styles.formGroup}>
-            <label htmlFor="type" className={styles.label}>
-              Tipo de Treino
-            </label>
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>Pace (min/km)</label>
+          <div className={styles.paceRange}>
             <select
-              id="type"
-              name="type"
-              value={formData.type}
-              onChange={handleChange}
-              className={styles.select}
-            >
-              <option value="running">🏃‍♂️ Corrida</option>
-              <option value="cycling">🚴‍♂️ Ciclismo</option>
-              <option value="walking">🚶‍♂️ Caminhada</option>
-              <option value="trail">🥾 Trail Running</option>
-            </select>
-          </div>
-
-          {/* Localização */}
-          <div className={styles.formGroup}>
-            <label htmlFor="location" className={styles.label}>
-              Cidade *
-            </label>
-            <select
-              id="location"
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              className={styles.select}
+              className={styles.paceSelect}
+              value={paceMin}
+              onChange={(e) => setPaceMin(e.target.value)}
               required
             >
-              <option value="">Selecione uma cidade</option>
-              {cidades.map((cidade) => (
-                <option key={cidade} value={cidade}>
-                  {cidade}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Data e Hora */}
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label htmlFor="date" className={styles.label}>
-                Data *
-              </label>
-              <input
-                type="date"
-                id="date"
-                name="date"
-                value={formData.date}
-                onChange={handleChange}
-                className={styles.input}
-                required
-                min={new Date().toISOString().split('T')[0]}
-              />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label htmlFor="time" className={styles.label}>
-                Hora *
-              </label>
-              <input
-                type="time"
-                id="time"
-                name="time"
-                value={formData.time}
-                onChange={handleChange}
-                className={styles.input}
-                required
-              />
-            </div>
-          </div>
-
-          {/* Pace */}
-          <div className={styles.formGroup}>
-            <label htmlFor="pace" className={styles.label}>
-              Pace (min/km) *
-            </label>
-            <select
-              id="pace"
-              name="pace"
-              value={formData.pace}
-              onChange={handlePaceChange}
-              className={styles.select}
-              required
-            >
-              <option value="">Selecione o pace</option>
+              <option value="">De...</option>
               {paceOptions.map((pace) => (
-                <option key={pace} value={pace}>
-                  {pace} min/km
+                <option key={`min-${pace}`} value={pace}>
+                  {pace}
+                </option>
+              ))}
+            </select>
+            <span className={styles.paceSeparator}>até</span>
+            <select
+              className={styles.paceSelect}
+              value={paceMax}
+              onChange={(e) => setPaceMax(e.target.value)}
+              required
+            >
+              <option value="">Até...</option>
+              {paceOptions.map((pace) => (
+                <option key={`max-${pace}`} value={pace}>
+                  {pace}
                 </option>
               ))}
             </select>
           </div>
+          {paceMin && paceMax && (
+            <div className={styles.paceInfo}>
+              Intervalo selecionado: <strong>{paceMin} - {paceMax}</strong>
+              <br />
+              <small>Treinos com pace entre {paceMin} e {paceMax} serão encontrados</small>
+            </div>
+          )}
+        </div>
 
-          {/* Distância */}
-          <div className={styles.formGroup}>
-            <label htmlFor="distance" className={styles.label}>
-              Distância (km) - Opcional
-            </label>
-            <input
-              type="number"
-              id="distance"
-              name="distance"
-              value={formData.distance}
-              onChange={handleChange}
-              placeholder="Ex: 5, 10, 21.1..."
-              step="0.1"
-              min="0"
-              className={styles.input}
-            />
-          </div>
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>Cidade</label>
+          <select
+            className={styles.input}
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            required
+          >
+            <option value="">Selecione...</option>
+            {cidades.map((cidade) => (
+              <option value={cidade} key={cidade}>
+                {cidade}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          {/* Descrição */}
-          <div className={styles.formGroup}>
-            <label htmlFor="description" className={styles.label}>
-              Descrição - Opcional
-            </label>
-            <textarea
-              id="description"
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              placeholder="Descreva seu treino, local de encontro, observações..."
-              rows="4"
-              className={styles.textarea}
-            />
-          </div>
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>Dia</label>
+          <input
+            className={styles.input}
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            required
+          />
+        </div>
 
-          {/* Treino Privado */}
-          <div className={styles.formGroup}>
-            <label className={styles.checkboxLabel}>
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>Horário</label>
+          <input
+            className={styles.input}
+            type="time"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            required
+          />
+        </div>
+
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>Método de Rota</label>
+          <div className={styles.routeMethod}>
+            <label className={styles.radioLabel}>
               <input
-                type="checkbox"
-                name="isPrivate"
-                checked={formData.isPrivate}
-                onChange={handleChange}
-                className={styles.checkbox}
+                type="radio"
+                value="map"
+                checked={routeMethod === "map"}
+                onChange={(e) => setRouteMethod(e.target.value)}
               />
-              <span className={styles.checkboxText}>
-                🔒 Tornar treino privado
-              </span>
+              Marcar trajeto completo no mapa
             </label>
-            <small className={styles.helpText}>
-              Treinos privados são visíveis apenas para participantes convidados
-            </small>
+            <label className={styles.radioLabel}>
+              <input
+                type="radio"
+                value="distance"
+                checked={routeMethod === "distance"}
+                onChange={(e) => setRouteMethod(e.target.value)}
+              />
+              Definir distância manual (apenas ponto de início)
+            </label>
           </div>
+        </div>
 
-          {/* Botões */}
-          <div className={styles.buttonGroup}>
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className={styles.cancelButton}
-              disabled={loading}
-            >
-              Cancelar
-            </button>
-            
-            <button
-              type="submit"
-              className={styles.submitButton}
-              disabled={loading}
-            >
-              {loading ? "Criando..." : "🎯 Criar Treino"}
-            </button>
+        {routeMethod === "distance" && (
+          <div className={styles.inputGroup}>
+            <label className={styles.label}>Distância (km)</label>
+            <input
+              className={styles.input}
+              type="number"
+              step="0.1"
+              min="0.1"
+              value={customDistance}
+              onChange={(e) => setCustomDistance(e.target.value)}
+              required={routeMethod === "distance"}
+              placeholder="Ex: 5.0"
+            />
           </div>
-        </form>
-      </div>
+        )}
+
+        <div className={styles.mapSection}>
+          <div className={styles.mapContainer}>
+            <MapCreator
+              route={route}
+              onRouteChange={handleMapClick}
+              singlePoint={routeMethod === "distance"}
+            />
+          </div>
+          
+          <div className={styles.routeSummary}>
+            {routeMethod === "map" ? (
+              <>
+                <div className={styles.summaryItem}>
+                  <span>📍 Pontos na rota:</span>
+                  <strong>{route.length}</strong>
+                </div>
+                <div className={styles.summaryItem}>
+                  <span>📏 Distância:</span>
+                  <strong>{distance.toFixed(2)} km</strong>
+                </div>
+                <div className={styles.instructions}>
+                  💡 Clique no mapa para ADICIONAR pontos • Clique nos pontos para REMOVER
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles.summaryItem}>
+                  <span>📍 Ponto de início:</span>
+                  <strong>{route.length > 0 ? "Definido" : "Não definido"}</strong>
+                </div>
+                <div className={styles.summaryItem}>
+                  <span>📏 Distância:</span>
+                  <strong>{customDistance || "0"} km</strong>
+                </div>
+                <div className={styles.instructions}>
+                  💡 Clique no mapa para DEFINIR o ponto de início
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>
+            Treino Privado?{" "}
+            <input
+              type="checkbox"
+              checked={isPrivate}
+              onChange={(e) => setIsPrivate(e.target.checked)}
+            />
+          </label>
+        </div>
+
+        {isPrivate && (
+          <div className={styles.inputGroup}>
+            <label className={styles.label}>Senha para o treino</label>
+            <input
+              className={styles.input}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required={isPrivate}
+              minLength={4}
+            />
+          </div>
+        )}
+
+        <button
+          className={styles.submitButton}
+          type="submit"
+          disabled={
+            routeMethod === "map" 
+              ? route.length < 2 
+              : routeMethod === "distance" 
+                ? !customDistance || parseFloat(customDistance) <= 0 || route.length === 0
+                : true
+          }
+        >
+          {routeMethod === "map" && route.length < 2
+            ? "Adicione pelo menos 2 pontos no mapa"
+            : routeMethod === "distance" && (!customDistance || parseFloat(customDistance) <= 0)
+            ? "Informe uma distância válida"
+            : routeMethod === "distance" && route.length === 0
+            ? "Marque o ponto de início no mapa"
+            : "Criar Treino"}
+        </button>
+      </form>
+
+      {showLimitModal && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h2>Limite atingido!</h2>
+            <p>
+              No plano básico, você só pode participar ou criar até{" "}
+              <b>3 treinos</b> no mês.
+              <br />
+              Para liberar treinos ilimitados, assine o Premium!
+            </p>
+            <div className={styles.modalButtons}>
+              <button
+                className={styles.assinarBtn}
+                onClick={() => {
+                  setShowLimitModal(false);
+                  router.push("/assinatura");
+                }}
+              >
+                Assinar Premium
+              </button>
+              <button
+                className={styles.fecharBtn}
+                onClick={() => setShowLimitModal(false)}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
