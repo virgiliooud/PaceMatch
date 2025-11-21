@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     try {
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
-        mode: "payment", // Único pagamento (produto teste)
+        mode: "subscription", // Único pagamento (produto teste)
         line_items: [
           {
             price: "price_1SVhWiKAfVdjPCM9fGdWRzZx", // coloque aqui o PRICE_ID do produto teste
