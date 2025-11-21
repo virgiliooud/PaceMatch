@@ -14,10 +14,90 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import styles from "../../styles/WorkoutPage.module.css";
+import axios from "axios";
+import { MapContainer, TileLayer, Polyline, CircleMarker } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 
-// Importa o componente de visualização de rotas
-import dynamic from "next/dynamic";
-const WorkoutMap = dynamic(() => import("../../components/WorkoutMap"), { ssr: false });
+const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijk2MjE3OWE5YjI3MjRlMzVhNWYxNGU2MTNjMjJkNWNhIiwiaCI6Im11cm11cjY0In0=";
+
+function DetailedRouteMap({ route }) {
+  const [polyline, setPolyline] = useState([]);
+
+  useEffect(() => {
+    async function fetchDetailedRoute() {
+      if (!route || route.length < 2) {
+        setPolyline([]);
+        return;
+      }
+      try {
+        const coords = route.map(p => [p.lng, p.lat]);
+        const body = { coordinates: coords };
+        const res = await axios.post(
+          "https://api.openrouteservice.org/v2/directions/foot-walking/geojson",
+          body,
+          {
+            headers: {
+              Authorization: `Bearer ${ORS_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        const poly = res.data.features[0].geometry.coordinates.map(
+          ([lng, lat]) => [lat, lng]
+        );
+        setPolyline(poly);
+      } catch (err) {
+        setPolyline([]);
+        console.error("Erro ORS:", err?.response?.data || err);
+      }
+    }
+    fetchDetailedRoute();
+  }, [route]);
+
+  const hasRoute = route && route.length > 0;
+  const center = hasRoute ? [route[0].lat, route[0].lng] : [-27.5954, -48.548];
+
+  return (
+    <div style={{ height: "350px", width: "100%", margin: "30px 0" }}>
+      <MapContainer
+        center={center}
+        zoom={13}
+        style={{ height: "100%", width: "100%" }}
+        scrollWheelZoom
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
+        />
+        {/* Mostra a rota detalhada */}
+        {polyline.length > 1 && (
+          <Polyline
+            positions={polyline}
+            color="#00c6ff"
+            weight={5}
+            opacity={0.8}
+          />
+        )}
+        {/* Início em verde */}
+        {hasRoute && (
+          <CircleMarker
+            center={[route[0].lat, route[0].lng]}
+            radius={10}
+            pathOptions={{ color: "green", fillColor: "green", fillOpacity: 1, weight: 3 }}
+          />
+        )}
+        {/* Fim em vermelho */}
+        {hasRoute && route.length > 1 && (
+          <CircleMarker
+            center={[route[route.length - 1].lat, route[route.length - 1].lng]}
+            radius={10}
+            pathOptions={{ color: "red", fillColor: "red", fillOpacity: 1, weight: 3 }}
+          />
+        )}
+      </MapContainer>
+    </div>
+  );
+}
 
 export default function WorkoutPage() {
   const router = useRouter();
@@ -174,9 +254,9 @@ export default function WorkoutPage() {
         )}
       </div>
 
-      {/* Exibição da rota salva */}
+      {/* Mostra rota detalhada visual com só inicio e fim */}
       {workout.route && workout.route.length > 0 && (
-        <WorkoutMap route={workout.route} />
+        <DetailedRouteMap route={workout.route} />
       )}
 
       {user &&
@@ -213,15 +293,12 @@ export default function WorkoutPage() {
         </ul>
       )}
 
-      {/* Modal Limite */}
       {showLimitModal && (
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>
             <h2>Limite atingido!</h2>
             <p>
-              No plano básico, você só pode participar ou criar até <b>3 treinos</b>{" "}
-              no mês.
-              <br />
+              No plano básico, você só pode participar ou criar até <b>3 treinos</b> no mês.<br />
               Para liberar treinos ilimitados, assine o Premium!
             </p>
             <button

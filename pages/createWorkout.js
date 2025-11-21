@@ -1,25 +1,28 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "../firebase";
-import { collection, addDoc, query, where, getDocs, doc, getDoc, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+  Timestamp,
+} from "firebase/firestore";
 import { useRouter } from "next/router";
 import styles from "../styles/CreateWorkout.module.css";
 import dynamic from "next/dynamic";
 
-const MapCreator = dynamic(() => import("../components/MapCreator"), { ssr: false });
+// MapCreator corrigido INLINE para garantir que funciona
+const MapCreator = dynamic(() => import("../components/MapCreator"), { 
+  ssr: false,
+  loading: () => <div style={{height: "350px", background: "#eee", display: "flex", alignItems: "center", justifyContent: "center"}}>Carregando mapa...</div>
+});
 
-// Lista de cidades para seleção
 const cidades = [
-  "São Paulo",
-  "Rio de Janeiro",
-  "Florianópolis e região",
-  "Belo Horizonte",
-  "Curitiba",
-  "Porto Alegre",
-  "Brasília",
-  "Recife",
-  "Fortaleza",
-  "Salvador"
-  // Adicione mais cidades conforme sua necessidade
+  "São Paulo", "Rio de Janeiro", "Florianópolis e região", "Belo Horizonte",
+  "Curitiba", "Porto Alegre", "Brasília", "Recife", "Fortaleza", "Salvador"
 ];
 
 export default function CreateWorkout() {
@@ -33,13 +36,17 @@ export default function CreateWorkout() {
   const [route, setRoute] = useState([]);
   const [distance, setDistance] = useState(0);
   const [showLimitModal, setShowLimitModal] = useState(false);
-
   const router = useRouter();
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((u) => setUser(u));
     return () => unsub();
   }, []);
+
+  // DEBUG: log da route
+  useEffect(() => {
+    console.log("📍 ROUTE NO CREATEWORKOUT:", route);
+  }, [route]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -109,6 +116,22 @@ export default function CreateWorkout() {
   return (
     <div className={styles.container}>
       <h1 className={styles.titulo}>Criar Novo Treino</h1>
+      
+      {/* DEBUG INFO */}
+      <div style={{
+        background: "#2a2a2a", 
+        padding: "10px", 
+        borderRadius: "5px", 
+        marginBottom: "15px",
+        fontSize: "14px"
+      }}>
+        <div style={{color: "#00ff88"}}>📍 Pontos na rota: <strong>{route.length}</strong></div>
+        <div style={{color: "#00ff88"}}>📏 Distância: <strong>{distance.toFixed(2)} km</strong></div>
+        <div style={{color: "#ffaa00", fontSize: "12px", marginTop: "5px"}}>
+          💡 Clique no mapa para ADICIONAR pontos • Clique nos círculos coloridos para REMOVER
+        </div>
+      </div>
+
       <form onSubmit={handleSubmit} className={styles.form}>
         <div className={styles.inputGroup}>
           <label className={styles.label}>Nome do treino</label>
@@ -140,7 +163,6 @@ export default function CreateWorkout() {
             required
           />
         </div>
-        {/* Select de cidade */}
         <div className={styles.inputGroup}>
           <label className={styles.label}>Cidade</label>
           <select
@@ -177,13 +199,25 @@ export default function CreateWorkout() {
         </div>
         <div className={styles.mapContainer}>
           <MapCreator
+            route={route}
             onRouteChange={(waypoints, dist) => {
+              console.log("🔄 CreateWorkout recebendo nova route:", waypoints);
               setRoute(waypoints);
               setDistance(dist);
             }}
           />
         </div>
-        <button className={styles.submitButton} type="submit">Criar Treino</button>
+        <button 
+          className={styles.submitButton} 
+          type="submit"
+          disabled={route.length < 2}
+          style={{
+            opacity: route.length < 2 ? 0.6 : 1,
+            cursor: route.length < 2 ? "not-allowed" : "pointer"
+          }}
+        >
+          {route.length < 2 ? "Adicione pelo menos 2 pontos no mapa" : "Criar Treino"}
+        </button>
       </form>
 
       {/* Modal limite */}
@@ -195,13 +229,21 @@ export default function CreateWorkout() {
               No plano básico, você só pode participar ou criar até <b>3 treinos</b> no mês.<br />
               Para liberar treinos ilimitados, assine o Premium!
             </p>
-            <button className={styles.assinarBtn} onClick={() => {
-              setShowLimitModal(false);
-              router.push("/assinatura");
-            }}>
+            <button
+              className={styles.assinarBtn}
+              onClick={() => {
+                setShowLimitModal(false);
+                router.push("/assinatura");
+              }}
+            >
               Assinar Premium
             </button>
-            <button className={styles.fecharBtn} onClick={() => setShowLimitModal(false)}>Fechar</button>
+            <button
+              className={styles.fecharBtn}
+              onClick={() => setShowLimitModal(false)}
+            >
+              Fechar
+            </button>
           </div>
         </div>
       )}

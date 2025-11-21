@@ -1,9 +1,11 @@
+// pages/_app.js
 import '../styles/global.css';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
 import AuthProvider from "../components/AuthProvider";
+import Chatbot from "../components/Chatbot";  // Componente do Dialogflow
 
 export default function MyApp({ Component, pageProps }) {
   const router = useRouter();
@@ -38,10 +40,10 @@ export default function MyApp({ Component, pageProps }) {
     );
   }
 
-  // Envolva o componente com AuthProvider
   return (
     <AuthProvider>
       <Component {...pageProps} />
+      <Chatbot />  {/* Chatbot do Dialogflow */}
     </AuthProvider>
   );
 }

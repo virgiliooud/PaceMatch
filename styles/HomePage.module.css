@@ -225,3 +225,19 @@
   width: 200px; /* ajuste o tamanho que preferir */
   height: auto;
 }
+
+.deleteButton {
+  background: #e53935;         /* Vermelho Google/Material */
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: background 0.2s;
+}
+
+.deleteButton:hover {
+  background: #c62828;
+}
