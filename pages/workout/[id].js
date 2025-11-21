@@ -33,7 +33,8 @@ export default function WorkoutPage() {
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [styledRoute, setStyledRoute] = useState(null);
 
-  const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijk2MjE3OWE5YjI3MjRlMzVhNWYxNGU2MTNjMjJkNWNhIiwiaCI6Im11cm11cjY0In0=";
+  const ORS_API_KEY =
+    "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijk2MjE3OWE5YjI3MjRlMzVhNWYxNGU2MTNjMjJkNWNhIiwiaCI6Im11cm11cjY0In0=";
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((u) => setUser(u));
@@ -41,7 +42,7 @@ export default function WorkoutPage() {
   }, []);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !user) return;
 
     const loadWorkout = async () => {
       const ref = doc(db, "workouts", id);
@@ -50,6 +51,14 @@ export default function WorkoutPage() {
 
       const data = snap.data();
       if (!Array.isArray(data.participants)) data.participants = [];
+
+      // Insere o criador automaticamente nos participantes se faltar
+      if (data.creatorId === user.uid && !data.participants.includes(user.uid)) {
+        await updateDoc(ref, {
+          participants: arrayUnion(user.uid),
+        });
+        data.participants.push(user.uid);
+      }
 
       setWorkout(data);
 
@@ -73,10 +82,16 @@ export default function WorkoutPage() {
           setStyledRoute(null);
         }
       }
+      
+      if (data.participants.length > 0) {
+        loadParticipantsNames(data.participants);
+      } else {
+        setParticipants([]);
+      }
     };
 
     loadWorkout();
-  }, [id]);
+  }, [id, user]);
 
   const loadParticipantsNames = async (ids) => {
     const list = [];
@@ -90,14 +105,6 @@ export default function WorkoutPage() {
     }
     setParticipants(list);
   };
-
-  useEffect(() => {
-    if (workout && Array.isArray(workout.participants) && workout.participants.length > 0) {
-      loadParticipantsNames(workout.participants);
-    } else {
-      setParticipants([]);
-    }
-  }, [workout]);
 
   const joinWorkout = async () => {
     if (!user) return;
