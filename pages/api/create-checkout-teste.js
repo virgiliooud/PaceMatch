@@ -1,15 +1,15 @@
 import Stripe from "stripe";
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY); // pode por sua chave secreta direto
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
   if (req.method === "POST") {
     try {
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
-        mode: "payment",
+        mode: "payment", // <- pagamento único/avulso!
         line_items: [
           {
-            price: "price_1SViSWKAfVdjPCM9xO9qcUTq", // coloque o seu PRICE ID AQUI
+            price: "price_1SViSWKAfVdjPCM9xO9qcUTq", // troque aqui pelo seu price_id de teste
             quantity: 1,
           },
         ],
@@ -18,6 +18,7 @@ export default async function handler(req, res) {
       });
       res.status(200).json({ url: session.url });
     } catch (err) {
+      console.error(err);
       res.status(500).json({ error: err.message });
     }
   } else {
