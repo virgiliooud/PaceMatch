@@ -323,3 +323,340 @@
     flex-direction: column;
   }
 }
+
+/* Adicione estas classes ao seu CSS existente */
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.userSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.planoBadge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.planoBadge.basic {
+  background: #333;
+  color: #fff;
+  border: 1px solid #555;
+}
+
+.planoBadge.premium {
+  background: linear-gradient(45deg, #FFD700, #FFA500);
+  color: #000;
+  border: 1px solid #FFD700;
+}
+
+.welcomeSection {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.greeting {
+  font-size: 2rem;
+  margin-bottom: 8px;
+  background: linear-gradient(45deg, #00c6ff, #0072ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.quickActions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-bottom: 30px;
+}
+
+.primaryButton {
+  background: linear-gradient(45deg, #00c6ff, #0072ff);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 25px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.secondaryButton {
+  background: #333;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 25px;
+  text-decoration: none;
+  font-weight: bold;
+  border: 1px solid #555;
+  transition: all 0.3s ease;
+}
+
+.filtersSection {
+  background: #1a1a1a;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 30px;
+  border: 1px solid #333;
+}
+
+.filtersGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.filterSelect, .filterInput {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #2a2a2a;
+  color: white;
+}
+
+.clearFiltersButton {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.workoutsGrid {
+  display: grid;
+  gap: 20px;
+}
+
+.workoutCard {
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #333;
+  transition: all 0.3s ease;
+}
+
+.workoutCard:hover {
+  border-color: #00c6ff;
+  transform: translateY(-2px);
+}
+
+.cardHeader {
+  margin-bottom: 15px;
+}
+
+.workoutName {
+  font-size: 1.3rem;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.privateBadge {
+  font-size: 0.9rem;
+}
+
+.workoutMeta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.workoutType {
+  background: #0072ff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.workoutPace {
+  background: #00c6ff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.cardContent {
+  margin-bottom: 15px;
+}
+
+.workoutInfo {
+  display: grid;
+  gap: 8px;
+}
+
+.infoItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.distanceBadge {
+  background: #28a745;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  margin-top: 10px;
+  display: inline-block;
+}
+
+.cardActions {
+  display: flex;
+  gap: 10px;
+}
+
+.viewButton, .chatButton {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.viewButton {
+  background: #0072ff;
+  color: white;
+  flex: 1;
+}
+
+.chatButton {
+  background: #28a745;
+  color: white;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 40px 20px;
+  background: #1a1a1a;
+  border-radius: 12px;
+  border: 2px dashed #333;
+}
+
+.emptyIcon {
+  font-size: 3rem;
+  margin-bottom: 15px;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.spinner {
+  border: 3px solid #333;
+  border-top: 3px solid #00c6ff;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* CORREÇÕES NO CSS */
+
+/* ✅ Saudação sem gradiente azul */
+.greeting {
+  font-size: 2rem;
+  margin-bottom: 8px;
+  color: white; /* CORRIGIDO: Texto branco normal */
+}
+
+/* ✅ Layout melhorado dos filtros */
+.filtersGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+/* ✅ Container do filtro de pace */
+.paceFilterContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #2a2a2a;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+.paceSelect {
+  flex: 1;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: #1a1a1a;
+  color: white;
+  font-size: 0.9rem;
+}
+
+.paceSeparator {
+  color: #888;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.paceFilterInfo {
+  background: #0072ff;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  margin-bottom: 10px;
+  display: inline-block;
+}
+
+/* ✅ Ajustes nos selects e inputs */
+.filterSelect, .filterInput {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #2a2a2a;
+  color: white;
+  font-size: 0.9rem;
+}
+
+/* ✅ Melhor espaçamento geral */
+.filtersSection {
+  background: #1a1a1a;
+  padding: 25px;
+  border-radius: 12px;
+  margin-bottom: 30px;
+  border: 1px solid #333;
+}
+
+/* ✅ Cards mais compactos */
+.workoutCard {
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #333;
+  transition: all 0.3s ease;
+}
+
+.workoutCard:hover {
+  border-color: #00c6ff;
+  transform: translateY(-2px);
+}
+

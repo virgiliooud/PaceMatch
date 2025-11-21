@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { db, auth } from "../firebase";
-import { collection, onSnapshot, doc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, getDoc, query, orderBy } from "firebase/firestore";
 import { useRouter } from "next/router";
 import styles from "../styles/HomePage.module.css";
 
@@ -19,10 +19,17 @@ const cidades = [
   "Florianópolis e região",
 ];
 
+const paceOptions = [
+  "2:30", "2:45", "3:00", "3:15", "3:30", "3:45", "4:00", "4:15", "4:30", "4:45",
+  "5:00", "5:15", "5:30", "5:45", "6:00", "6:15", "6:30", "6:45", "7:00", "7:15",
+  "7:30", "7:45", "8:00", "8:15", "8:30", "8:45", "9:00", "9:15", "9:30", "9:45", "10:00"
+];
+
 export default function HomePage() {
   const [user, setUser] = useState(null);
   const [userPlano, setUserPlano] = useState("basic");
   const [workouts, setWorkouts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [cidadeFiltro, setCidadeFiltro] = useState("");
   const [paceFiltro, setPaceFiltro] = useState("");
@@ -34,174 +41,410 @@ export default function HomePage() {
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
       setUser(u);
-
       if (u) {
-        const userDoc = await getDoc(doc(db, "users", u.uid));
-        setUserPlano(userDoc.exists() ? userDoc.data().plano || "basic" : "basic");
+        try {
+          const userDoc = await getDoc(doc(db, "users", u.uid));
+          const plano = userDoc.exists() ? userDoc.data().plano || "basic" : "basic";
+          setUserPlano(plano);
+        } catch (error) {
+          console.error("❌ Erro ao buscar plano:", error);
+        }
       }
     });
     return unsub;
   }, []);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "workouts"), (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setWorkouts(list);
-    });
-    return unsub;
+    try {
+      const workoutsQuery = query(
+        collection(db, "workouts"), 
+        orderBy("createdAt", "desc")
+      );
+      
+      const unsub = onSnapshot(workoutsQuery, 
+        (snapshot) => {
+          const list = snapshot.docs.map((doc) => {
+            const data = doc.data();
+            console.log("📥 Workout carregado:", {
+              id: doc.id,
+              name: data.name,
+              pace: data.pace,
+              paceMin: data.paceMin,
+              paceMax: data.paceMax,
+              location: data.location
+            });
+            return { 
+              id: doc.id, 
+              ...data,
+              name: data.name || "Treino sem nome",
+              location: data.location || "Local não definido",
+              route: data.route || [],
+              participants: data.participants || [],
+              isPrivate: data.isPrivate || false
+            };
+          });
+          
+          setWorkouts(list);
+          setLoading(false);
+        },
+        (error) => {
+          console.error("❌ ERRO NO LISTENER:", error);
+          setLoading(false);
+        }
+      );
+
+      return unsub;
+    } catch (error) {
+      console.error("❌ ERRO AO CONFIGURAR LISTENER:", error);
+      setLoading(false);
+    }
   }, []);
 
-  // Filtra os treinos de acordo com os filtros aplicados
-  const workoutsValidos = workouts.filter((w) => {
-    if (!w.name || !w.name.trim() || !Array.isArray(w.route) || w.route.length <= 1) {
+  // ✅ FUNÇÃO PARA CONVERTER PACE EM SEGUNDOS
+  const convertPaceToSeconds = (pace) => {
+    if (!pace) return 0;
+    const [minutos, segundos] = pace.split(':').map(Number);
+    return minutos * 60 + segundos;
+  };
+
+  // ✅ FILTRO COM DEBUG DETALHADO
+  const workoutsValidos = workouts.filter((workout) => {
+    if (!workout.name || workout.name.trim() === "" || !workout.route || workout.route.length === 0) {
       return false;
     }
-    if (cidadeFiltro && w.location !== cidadeFiltro) return false;
-    if (paceFiltro && !w.pace.toLowerCase().includes(paceFiltro.toLowerCase())) return false;
-    if (publicoPrivadoFiltro === "publico" && w.isPrivate) return false;
-    if (publicoPrivadoFiltro === "privado" && !w.isPrivate) return false;
-    if (nomeFiltro && !w.name.toLowerCase().includes(nomeFiltro.toLowerCase())) return false;
+
+    // Filtro de cidade
+    if (cidadeFiltro && workout.location !== cidadeFiltro) {
+      console.log(`📍 Filtrado por cidade: ${workout.name} - ${workout.location} !== ${cidadeFiltro}`);
+      return false;
+    }
+
+    // ✅ FILTRO DE PACE COM DEBUG DETALHADO
+    if (paceFiltro) {
+      console.log(" ");
+      console.log("🔍 FILTRO PACE ANALISANDO:", workout.name);
+      console.log("   📊 Dados do workout:");
+      console.log("   - pace:", workout.pace);
+      console.log("   - paceMin:", workout.paceMin);
+      console.log("   - paceMax:", workout.paceMax);
+      console.log("   🎯 Filtro selecionado:", paceFiltro);
+      
+      let passouNoFiltro = false;
+      
+      // Primeiro tenta usar paceMin e paceMax se existirem
+      if (workout.paceMin && workout.paceMax) {
+        const paceFiltroSegundos = convertPaceToSeconds(paceFiltro);
+        const workoutMinSegundos = convertPaceToSeconds(workout.paceMin);
+        const workoutMaxSegundos = convertPaceToSeconds(workout.paceMax);
+        
+        console.log("   ⏱️ Conversão para segundos:");
+        console.log("   - Filtro:", paceFiltro, "→", paceFiltroSegundos, "segundos");
+        console.log("   - Min:", workout.paceMin, "→", workoutMinSegundos, "segundos");
+        console.log("   - Max:", workout.paceMax, "→", workoutMaxSegundos, "segundos");
+        
+        const estaDentroIntervalo = paceFiltroSegundos >= workoutMinSegundos && paceFiltroSegundos <= workoutMaxSegundos;
+        console.log("   ✅ Está dentro do intervalo?", estaDentroIntervalo);
+        
+        if (estaDentroIntervalo) {
+          passouNoFiltro = true;
+        }
+      }
+      
+      // Se não passou pelo primeiro método, tenta fallback na string do pace
+      if (!passouNoFiltro && workout.pace) {
+        console.log("   🔄 Tentando fallback na string do pace...");
+        // Fallback simples: verifica se o pace filtro aparece em algum lugar do pace string
+        if (workout.pace.includes(paceFiltro)) {
+          console.log("   ✅ Fallback: Pace encontrado na string");
+          passouNoFiltro = true;
+        } else {
+          console.log("   ❌ Fallback: Pace NÃO encontrado na string");
+        }
+      }
+      
+      if (!passouNoFiltro) {
+        console.log("   🚫 WORKOUT FILTRADO FORA - Não passou no filtro de pace");
+        return false;
+      }
+      
+      console.log("   ✅ WORKOUT MANTIDO - Passou no filtro de pace");
+    }
+
+    // Filtro público/privado
+    if (publicoPrivadoFiltro === "publico" && workout.isPrivate) {
+      console.log(`🔒 Filtrado por público/privado: ${workout.name} - é privado`);
+      return false;
+    }
+    if (publicoPrivadoFiltro === "privado" && !workout.isPrivate) {
+      console.log(`🔓 Filtrado por público/privado: ${workout.name} - é público`);
+      return false;
+    }
+
+    // Filtro por nome
+    if (nomeFiltro && !workout.name.toLowerCase().includes(nomeFiltro.toLowerCase())) {
+      console.log(`📝 Filtrado por nome: ${workout.name} não contém ${nomeFiltro}`);
+      return false;
+    }
+    
+    console.log(`🎯 WORKOUT ACEITO: ${workout.name}`);
     return true;
   });
 
-  if (!user)
+  const formatarData = (dateString) => {
+    if (!dateString) return "Data não definida";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('pt-BR');
+    } catch {
+      return "Data inválida";
+    }
+  };
+
+  const isParticipante = (workout) => {
+    return user && workout.participants?.includes(user.uid);
+  };
+
+  if (!user) {
     return (
       <div className={styles.container}>
-        <h1 style={{ fontSize: "36px", marginBottom: "20px" }}>PaceMatch</h1>
+        <div className={styles.logoContainer}>
+          <img src="/logo.png" alt="PaceMatch Logo" className={styles.logo} />
+        </div>
+        <h1 className={styles.welcomeTitle}>PaceMatch</h1>
+        <p className={styles.welcomeSubtitle}>Encontre parceiros de treino perfeitos</p>
         <Link href="/login" className={styles.button}>
-          Fazer Login
+          🏃‍♂️ Fazer Login
         </Link>
       </div>
     );
+  }
+
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.logoContainer}>
+          <img src="/logo.png" alt="PaceMatch Logo" className={styles.logo} />
+        </div>
+        <div className={styles.loading}>
+          <div className={styles.spinner}></div>
+          <p>Carregando treinos...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>
-      {/* Logo centralizada */}
-      <div className={styles.logoContainer}>
-        <img src="/logo.png" alt="PaceMatch Logo" className={styles.logo} />
+      {/* DEBUG INFO */}
+      <div style={{
+        background: '#1a1a1a',
+        color: '#00ff00',
+        padding: '10px',
+        borderRadius: '8px',
+        marginBottom: '20px',
+        fontSize: '12px',
+        border: '1px solid #333'
+      }}>
+        <strong>🔧 DEBUG:</strong> Treinos carregados: {workouts.length} | Filtrados: {workoutsValidos.length} | Pace selecionado: {paceFiltro || "Nenhum"}
+        <br />
+        <small>Abra o console (F12) para ver detalhes do filtro</small>
       </div>
 
-      {/* Top bar */}
-      <div className={styles.topBar} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <img
-          src={user?.photoURL}
-          alt="Foto"
-          onClick={() => router.push("/profile")}
-          className={styles.profileImg}
-        />
-        <div
-          style={{ color: "#fff", fontWeight: "bold", cursor: "pointer" }}
-          onClick={() => router.push("/assinatura")}
-        >
-          Plano: {userPlano === "premium" ? "Premium" : "Básico"} (Clique para gerenciar)
+      {/* Header */}
+      <div className={styles.header}>
+        <div className={styles.logoContainer}>
+          <img src="/logo.png" alt="PaceMatch Logo" className={styles.logo} />
         </div>
-      </div>
 
-      <h2 className={styles.greeting}>Olá, {user.displayName?.split(" ")[0]} 👟</h2>
-      <p className={styles.subText}>Veja os treinos disponíveis:</p>
-
-      {/* FILTROS */}
-      <div className={styles.filtros}>
-        <select
-          value={cidadeFiltro}
-          onChange={(e) => setCidadeFiltro(e.target.value)}
-          className={styles.selectFiltro}
-        >
-          <option value="">Filtrar por cidade</option>
-          {cidades.map((cidade) => (
-            <option key={cidade} value={cidade}>
-              {cidade}
-            </option>
-          ))}
-        </select>
-
-        <input
-          type="text"
-          placeholder="Filtrar por pace (ex: 5:30)"
-          value={paceFiltro}
-          onChange={(e) => setPaceFiltro(e.target.value)}
-          className={styles.inputFiltro}
-        />
-
-        <select
-          value={publicoPrivadoFiltro}
-          onChange={(e) => setPublicoPrivadoFiltro(e.target.value)}
-          className={styles.selectFiltro}
-        >
-          <option value="todos">Todos</option>
-          <option value="publico">Público</option>
-          <option value="privado">Privado</option>
-        </select>
-
-        <input
-          type="text"
-          placeholder="Buscar por nome do treino"
-          value={nomeFiltro}
-          onChange={(e) => setNomeFiltro(e.target.value)}
-          className={styles.inputFiltro}
-          style={{ width: "auto", flexGrow: 1 }}
-        />
-
-        <button
-          onClick={() => {
-            setCidadeFiltro("");
-            setPaceFiltro("");
-            setPublicoPrivadoFiltro("todos");
-            setNomeFiltro("");
-          }}
-          className={styles.botaoLimparFiltro}
-        >
-          Limpar filtros
-        </button>
-      </div>
-
-      <div className={styles.buttonGroup}>
-        <Link href="/createWorkout" className={styles.button}>
-          + Criar Treino
-        </Link>
-        <Link href="/myWorkouts" className={styles.button}>
-          Meus Treinos
-        </Link>
-      </div>
-
-      {workoutsValidos.map((workout) => (
-        <div key={workout.id} className={styles.card}>
-          <h3>
-            {workout.name}{" "}
-            {workout.isPrivate && (
-              <span title="Treino Privado" style={{ marginLeft: 8 }}>
-                🔒
-              </span>
-            )}
-          </h3>
-          <p>Tipo: {workout.type}</p>
-          <p>Pace: {workout.pace}</p>
-          <p>Local: {workout.location}</p>
-          <p>Horário: {workout.time}</p>
-          <p>Data: {workout.date ? new Date(workout.date).toLocaleDateString() : ""}</p>
-          <p>
-            <b>{workout.isPrivate ? "Privado" : "Público"}</b>
-          </p>
-          <p className="participants">Participantes: {workout.participants?.length || 0}</p>
-          <div className={styles.cardButtons}>
-            <button
-              onClick={() => router.push(`/workout/${workout.id}`)}
-              className={styles.primaryButton}
-            >
-              Ver Treino
-            </button>
-            {/* Botão do chat aparece somente para participantes */}
-            {user && workout.participants?.includes(user.uid) && (
-              <button
-                onClick={() => router.push(`/workoutChats/${workout.id}`)}
-                className={styles.chatButton}
-              >
-                💬 Chat
-              </button>
-            )}
+        <div className={styles.userSection}>
+          <img
+            src={user?.photoURL || "/default-avatar.png"}
+            alt="Foto"
+            onClick={() => router.push("/profile")}
+            className={styles.profileImg}
+          />
+          <div 
+            className={`${styles.planoBadge} ${userPlano === "premium" ? styles.premium : styles.basic}`}
+            onClick={() => router.push("/assinatura")}
+          >
+            {userPlano === "premium" ? "⭐ Premium" : "🔹 Básico"}
           </div>
         </div>
-      ))}
+      </div>
+
+      {/* Saudação */}
+      <div className={styles.welcomeSection}>
+        <h1 className={styles.greeting}>
+          Olá, {user.displayName?.split(" ")[0] || "Amigo"}!
+        </h1>
+        <p className={styles.subText}>
+          {workoutsValidos.length > 0 
+            ? `📊 ${workoutsValidos.length} treinos disponíveis` 
+            : "📝 Nenhum treino encontrado - seja o primeiro a criar!"}
+        </p>
+      </div>
+
+      {/* Ações Rápidas */}
+      <div className={styles.quickActions}>
+        <Link href="/createWorkout" className={styles.primaryButton}>
+          🏃‍♂️ Criar Treino
+        </Link>
+        <Link href="/myWorkouts" className={styles.secondaryButton}>
+          📋 Meus Treinos
+        </Link>
+      </div>
+
+      {/* Filtros */}
+      <div className={styles.filtersSection}>
+        <h3>🔍 Filtros</h3>
+        
+        <div className={styles.filtersGrid}>
+          {/* Cidade */}
+          <select
+            value={cidadeFiltro}
+            onChange={(e) => setCidadeFiltro(e.target.value)}
+            className={styles.filterSelect}
+          >
+            <option value="">🌆 Todas as cidades</option>
+            {cidades.map((cidade) => (
+              <option key={cidade} value={cidade}>
+                {cidade}
+              </option>
+            ))}
+          </select>
+
+          {/* Pace */}
+          <select
+            value={paceFiltro}
+            onChange={(e) => setPaceFiltro(e.target.value)}
+            className={styles.filterSelect}
+          >
+            <option value="">⏱️ Todos os paces</option>
+            {paceOptions.map((pace) => (
+              <option key={pace} value={pace}>
+                {pace} min/km
+              </option>
+            ))}
+          </select>
+
+          {/* Público/Privado */}
+          <select
+            value={publicoPrivadoFiltro}
+            onChange={(e) => setPublicoPrivadoFiltro(e.target.value)}
+            className={styles.filterSelect}
+          >
+            <option value="todos">🌐 Todos os treinos</option>
+            <option value="publico">🔓 Apenas públicos</option>
+            <option value="privado">🔒 Apenas privados</option>
+          </select>
+
+          {/* Nome */}
+          <input
+            type="text"
+            placeholder="🔎 Buscar por nome..."
+            value={nomeFiltro}
+            onChange={(e) => setNomeFiltro(e.target.value)}
+            className={styles.filterInput}
+          />
+        </div>
+
+        {/* Botão limpar filtros */}
+        {(cidadeFiltro || paceFiltro || publicoPrivadoFiltro !== "todos" || nomeFiltro) && (
+          <button
+            onClick={() => {
+              setCidadeFiltro("");
+              setPaceFiltro("");
+              setPublicoPrivadoFiltro("todos");
+              setNomeFiltro("");
+            }}
+            className={styles.clearFiltersButton}
+          >
+            🗑️ Limpar Filtros
+          </button>
+        )}
+      </div>
+
+      {/* Lista de Treinos */}
+      <div className={styles.workoutsGrid}>
+        {workoutsValidos.length === 0 ? (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}>🏃‍♂️</div>
+            <h3>Nenhum treino encontrado</h3>
+            <p>
+              {workouts.length === 0 
+                ? "Seja o primeiro a criar um treino!" 
+                : "Tente ajustar os filtros para ver mais resultados."}
+            </p>
+            <Link href="/createWorkout" className={styles.button}>
+              🏃‍♂️ Criar Primeiro Treino
+            </Link>
+          </div>
+        ) : (
+          workoutsValidos.map((workout) => (
+            <div key={workout.id} className={styles.workoutCard}>
+              <div className={styles.cardHeader}>
+                <h3 className={styles.workoutName}>
+                  {workout.name}
+                  {workout.isPrivate && (
+                    <span className={styles.privateBadge} title="Treino Privado">
+                      🔒
+                    </span>
+                  )}
+                </h3>
+                <div className={styles.workoutMeta}>
+                  <span className={styles.workoutType}>{workout.type}</span>
+                  <span className={styles.workoutPace}>⏱️ {workout.pace}</span>
+                </div>
+              </div>
+
+              <div className={styles.cardContent}>
+                <div className={styles.workoutInfo}>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>📍</span>
+                    {workout.location}
+                  </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>📅</span>
+                    {formatarData(workout.date)}
+                  </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>🕒</span>
+                    {workout.time}
+                  </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>👥</span>
+                    {workout.participants?.length || 0} participantes
+                  </div>
+                </div>
+
+                {workout.distance && (
+                  <div className={styles.distanceBadge}>
+                    📏 {workout.distance} km
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.cardActions}>
+                <button
+                  onClick={() => router.push(`/workout/${workout.id}`)}
+                  className={styles.viewButton}
+                >
+                  👀 Ver Detalhes
+                </button>
+                
+                {isParticipante(workout) && (
+                  <button
+                    onClick={() => router.push(`/workoutChats/${workout.id}`)}
+                    className={styles.chatButton}
+                  >
+                    💬 Chat
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
