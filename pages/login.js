@@ -6,12 +6,14 @@ import styles from "../styles/Login.module.css";
 
 export default function Login() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [loginLoading, setLoginLoading] = useState(false);
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((u) => {
       setUser(u);
+      setCheckingAuth(false);
       if (u) {
         router.replace("/home");
       }
@@ -20,29 +22,35 @@ export default function Login() {
   }, [router]);
 
   const dologin = async () => {
-    setLoading(true);
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    setLoginLoading(true);
     try {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
       if (isIOS) {
         await signInWithRedirect(auth, provider);
       } else {
         await signInWithPopup(auth, provider);
       }
     } catch (err) {
-      console.log(err);
       alert("Erro ao logar");
-      setLoading(false);
+      setLoginLoading(false);
     }
   };
 
-  if (user) return <div className={styles.container}>Carregando...</div>;
+  // Loading enquanto verifica autenticação
+  if (checkingAuth) return <div className={styles.container}>Carregando...</div>;
+  // Se logado, não mostra login (protegido via .replace)
+  if (user) return null;
 
   return (
     <div className={styles.container}>
       <h1 className={styles.title}>PaceMatch</h1>
       <p className={styles.subtitle}>Conecte. Combine. Corra junto.</p>
-      <button className={styles.loginButton} onClick={dologin} disabled={loading}>
-        {loading ? "Entrando..." : "Entrar com Google"}
+      <button
+        className={styles.loginButton}
+        onClick={dologin}
+        disabled={loginLoading}
+      >
+        {loginLoading ? "Entrando..." : "Entrar com Google"}
       </button>
     </div>
   );
