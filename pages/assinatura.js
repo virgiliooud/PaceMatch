@@ -62,15 +62,19 @@ export default function Assinatura() {
             <li>Receba notificações exclusivas</li>
             <li>Acesso a futuras funções avançadas</li>
           </ul>
-//          <button
+          <button
 //            className={styles.subscribeButton}
 //            onClick={handleSubscribe}
 //           disabled={loading}
           >
-            {loading ? "Carregando..." : "Assinar Agora"}
-          </button>
+            {loading ? "Carregando..." : ""} 
+
+          </button> 
+          
       </div>
     </div>
     </div>
   );
 }
+
+// dentro das aspas dps do carregando: Assinar Agora
