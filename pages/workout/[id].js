@@ -15,89 +15,150 @@ import {
 } from "firebase/firestore";
 import styles from "../../styles/WorkoutPage.module.css";
 import axios from "axios";
-import { MapContainer, TileLayer, Polyline, CircleMarker } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
+import dynamic from "next/dynamic";
 
 const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijk2MjE3OWE5YjI3MjRlMzVhNWYxNGU2MTNjMjJkNWNhIiwiaCI6Im11cm11cjY0In0=";
 
-function DetailedRouteMap({ route }) {
-  const [polyline, setPolyline] = useState([]);
+// 🔧 CORREÇÃO: Carregar componentes do Leaflet apenas no cliente
+const MapContainer = dynamic(
+  () => import("react-leaflet").then((mod) => mod.MapContainer),
+  { ssr: false }
+);
+const TileLayer = dynamic(
+  () => import("react-leaflet").then((mod) => mod.TileLayer),
+  { ssr: false }
+);
+const Polyline = dynamic(
+  () => import("react-leaflet").then((mod) => mod.Polyline),
+  { ssr: false }
+);
+const CircleMarker = dynamic(
+  () => import("react-leaflet").then((mod) => mod.CircleMarker),
+  { ssr: false }
+);
 
-  useEffect(() => {
-    async function fetchDetailedRoute() {
-      if (!route || route.length < 2) {
-        setPolyline([]);
-        return;
-      }
-      try {
-        const coords = route.map(p => [p.lng, p.lat]);
-        const body = { coordinates: coords };
-        const res = await axios.post(
-          "https://api.openrouteservice.org/v2/directions/foot-walking/geojson",
-          body,
-          {
-            headers: {
-              Authorization: `Bearer ${ORS_API_KEY}`,
-              "Content-Type": "application/json",
-            },
+// 🔧 CORREÇÃO: Componente do mapa carregado apenas no cliente
+const DetailedRouteMap = dynamic(
+  () => {
+    const InnerMap = ({ route }) => {
+      const [polyline, setPolyline] = useState([]);
+      const [mapReady, setMapReady] = useState(false);
+
+      useEffect(() => {
+        setMapReady(true);
+      }, []);
+
+      useEffect(() => {
+        async function fetchDetailedRoute() {
+          if (!route || route.length < 2) {
+            setPolyline([]);
+            return;
           }
+          try {
+            const coords = route.map(p => [p.lng, p.lat]);
+            const body = { coordinates: coords };
+            const res = await axios.post(
+              "https://api.openrouteservice.org/v2/directions/foot-walking/geojson",
+              body,
+              {
+                headers: {
+                  Authorization: `Bearer ${ORS_API_KEY}`,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+            const poly = res.data.features[0].geometry.coordinates.map(
+              ([lng, lat]) => [lat, lng]
+            );
+            setPolyline(poly);
+          } catch (err) {
+            setPolyline([]);
+            console.error("Erro ORS:", err?.response?.data || err);
+          }
+        }
+        fetchDetailedRoute();
+      }, [route]);
+
+      const hasRoute = route && route.length > 0;
+      const center = hasRoute ? [route[0].lat, route[0].lng] : [-27.5954, -48.548];
+
+      if (!mapReady) {
+        return (
+          <div style={{ 
+            height: "350px", 
+            width: "100%", 
+            background: "#f0f0f0", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center",
+            borderRadius: "10px"
+          }}>
+            <p>Carregando mapa...</p>
+          </div>
         );
-        const poly = res.data.features[0].geometry.coordinates.map(
-          ([lng, lat]) => [lat, lng]
-        );
-        setPolyline(poly);
-      } catch (err) {
-        setPolyline([]);
-        console.error("Erro ORS:", err?.response?.data || err);
       }
-    }
-    fetchDetailedRoute();
-  }, [route]);
 
-  const hasRoute = route && route.length > 0;
-  const center = hasRoute ? [route[0].lat, route[0].lng] : [-27.5954, -48.548];
-
-  return (
-    <div style={{ height: "350px", width: "100%", margin: "30px 0" }}>
-      <MapContainer
-        center={center}
-        zoom={13}
-        style={{ height: "100%", width: "100%" }}
-        scrollWheelZoom
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
-        />
-        {/* Mostra a rota detalhada */}
-        {polyline.length > 1 && (
-          <Polyline
-            positions={polyline}
-            color="#00c6ff"
-            weight={5}
-            opacity={0.8}
-          />
-        )}
-        {/* Início em verde */}
-        {hasRoute && (
-          <CircleMarker
-            center={[route[0].lat, route[0].lng]}
-            radius={10}
-            pathOptions={{ color: "green", fillColor: "green", fillOpacity: 1, weight: 3 }}
-          />
-        )}
-        {/* Fim em vermelho */}
-        {hasRoute && route.length > 1 && (
-          <CircleMarker
-            center={[route[route.length - 1].lat, route[route.length - 1].lng]}
-            radius={10}
-            pathOptions={{ color: "red", fillColor: "red", fillOpacity: 1, weight: 3 }}
-          />
-        )}
-      </MapContainer>
-    </div>
-  );
-}
+      return (
+        <div style={{ height: "350px", width: "100%", margin: "30px 0" }}>
+          <MapContainer
+            center={center}
+            zoom={13}
+            style={{ height: "100%", width: "100%" }}
+            scrollWheelZoom
+          >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
+            />
+            {/* Mostra a rota detalhada */}
+            {polyline.length > 1 && (
+              <Polyline
+                positions={polyline}
+                color="#00c6ff"
+                weight={5}
+                opacity={0.8}
+              />
+            )}
+            {/* Início em verde */}
+            {hasRoute && (
+              <CircleMarker
+                center={[route[0].lat, route[0].lng]}
+                radius={10}
+                pathOptions={{ color: "green", fillColor: "green", fillOpacity: 1, weight: 3 }}
+              />
+            )}
+            {/* Fim em vermelho */}
+            {hasRoute && route.length > 1 && (
+              <CircleMarker
+                center={[route[route.length - 1].lat, route[route.length - 1].lng]}
+                radius={10}
+                pathOptions={{ color: "red", fillColor: "red", fillOpacity: 1, weight: 3 }}
+              />
+            )}
+          </MapContainer>
+        </div>
+      );
+    };
+    return InnerMap;
+  },
+  { 
+    ssr: false,
+    loading: () => (
+      <div style={{ 
+        height: "350px", 
+        width: "100%", 
+        background: "#f0f0f0", 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "center",
+        borderRadius: "10px",
+        margin: "30px 0"
+      }}>
+        <p>Carregando mapa...</p>
+      </div>
+    )
+  }
+);
 
 export default function WorkoutPage() {
   const router = useRouter();
@@ -107,9 +168,13 @@ export default function WorkoutPage() {
   const [participants, setParticipants] = useState([]);
   const [user, setUser] = useState(null);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged((u) => setUser(u));
+    const unsub = auth.onAuthStateChanged((u) => {
+      setUser(u);
+      setLoading(false);
+    });
     return unsub;
   }, []);
 
@@ -117,105 +182,173 @@ export default function WorkoutPage() {
     if (!id) return;
 
     const loadWorkout = async () => {
-      const ref = doc(db, "workouts", id);
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        const data = snap.data();
-        if (!Array.isArray(data.participants)) {
-          data.participants = [];
-        }
-        setWorkout(data);
-        if (data.participants.length > 0) {
-          loadParticipantsNames(data.participants);
+      try {
+        const ref = doc(db, "workouts", id);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const data = snap.data();
+          if (!Array.isArray(data.participants)) {
+            data.participants = [];
+          }
+          setWorkout(data);
+          if (data.participants.length > 0) {
+            loadParticipantsNames(data.participants);
+          } else {
+            setParticipants([]);
+          }
         } else {
-          setParticipants([]);
+          setWorkout(null);
         }
+      } catch (error) {
+        console.error("Erro ao carregar treino:", error);
+        setWorkout(null);
       }
     };
 
     loadWorkout();
-    // eslint-disable-next-line
   }, [id]);
 
   const loadParticipantsNames = async (ids) => {
-    const list = [];
-    for (const uid of ids) {
-      const userRef = doc(db, "users", uid);
-      const userSnap = await getDoc(userRef);
-      list.push({
-        id: uid,
-        name: userSnap.exists() ? userSnap.data().name : "Usuário sem nome",
-      });
+    try {
+      const list = [];
+      for (const uid of ids) {
+        const userRef = doc(db, "users", uid);
+        const userSnap = await getDoc(userRef);
+        list.push({
+          id: uid,
+          name: userSnap.exists() ? userSnap.data().name : "Usuário sem nome",
+        });
+      }
+      setParticipants(list);
+    } catch (error) {
+      console.error("Erro ao carregar participantes:", error);
+      setParticipants([]);
     }
-    setParticipants(list);
   };
 
   const joinWorkout = async () => {
-    if (!user) return;
-    const userRef = await getDoc(doc(db, "users", user.uid));
-    const plano = userRef.exists() ? userRef.data().plano || "basic" : "basic";
+    if (!user || !workout) return;
+    
+    try {
+      const userRef = await getDoc(doc(db, "users", user.uid));
+      const plano = userRef.exists() ? userRef.data().plano || "basic" : "basic";
 
-    if (plano === "basic") {
-      const firstDay = new Date();
-      firstDay.setDate(1);
-      firstDay.setHours(0, 0, 0, 0);
+      if (plano === "basic") {
+        const firstDay = new Date();
+        firstDay.setDate(1);
+        firstDay.setHours(0, 0, 0, 0);
 
-      const qCriados = query(
-        collection(db, "workouts"),
-        where("creatorId", "==", user.uid),
-        where("createdAt", ">=", Timestamp.fromDate(firstDay))
-      );
-      const qEntrou = query(
-        collection(db, "workouts"),
-        where("participants", "array-contains", user.uid),
-        where("createdAt", ">=", Timestamp.fromDate(firstDay))
-      );
+        const qCriados = query(
+          collection(db, "workouts"),
+          where("creatorId", "==", user.uid),
+          where("createdAt", ">=", Timestamp.fromDate(firstDay))
+        );
+        const qEntrou = query(
+          collection(db, "workouts"),
+          where("participants", "array-contains", user.uid),
+          where("createdAt", ">=", Timestamp.fromDate(firstDay))
+        );
 
-      const [criadosSnap, entrouSnap] = await Promise.all([
-        getDocs(qCriados),
-        getDocs(qEntrou),
-      ]);
-      const criadosIds = criadosSnap.docs.map((doc) => doc.id);
-      const entrouIds = entrouSnap.docs.map((doc) => doc.id);
-      const totalUnico = new Set([...criadosIds, ...entrouIds]).size;
+        const [criadosSnap, entrouSnap] = await Promise.all([
+          getDocs(qCriados),
+          getDocs(qEntrou),
+        ]);
+        const criadosIds = criadosSnap.docs.map((doc) => doc.id);
+        const entrouIds = entrouSnap.docs.map((doc) => doc.id);
+        const totalUnico = new Set([...criadosIds, ...entrouIds]).size;
 
-      if (totalUnico >= 3) {
-        setShowLimitModal(true);
-        return;
+        if (totalUnico >= 3) {
+          setShowLimitModal(true);
+          return;
+        }
       }
+
+      const ref = doc(db, "workouts", id);
+      await updateDoc(ref, {
+        participants: arrayUnion(user.uid),
+      });
+
+      // Atualizar estado local
+      const newParticipants = [...workout.participants, user.uid];
+      setWorkout({
+        ...workout,
+        participants: newParticipants,
+      });
+      
+      // Recarregar nomes dos participantes
+      loadParticipantsNames(newParticipants);
+
+    } catch (error) {
+      console.error("Erro ao participar do treino:", error);
+      alert("Erro ao participar do treino. Tente novamente.");
     }
-
-    const ref = doc(db, "workouts", id);
-    await updateDoc(ref, {
-      participants: arrayUnion(user.uid),
-    });
-
-    loadParticipantsNames([...workout.participants, user.uid]);
-
-    setWorkout({
-      ...workout,
-      participants: [...workout.participants, user.uid],
-    });
   };
 
   const leaveWorkout = async () => {
-    if (!user) return;
-    const ref = doc(db, "workouts", id);
+    if (!user || !workout) return;
+    
+    try {
+      const ref = doc(db, "workouts", id);
+      await updateDoc(ref, {
+        participants: arrayRemove(user.uid),
+      });
 
-    await updateDoc(ref, {
-      participants: arrayRemove(user.uid),
-    });
+      // Atualizar estado local
+      const filteredParticipants = workout.participants.filter((p) => p !== user.uid);
+      setWorkout({
+        ...workout,
+        participants: filteredParticipants,
+      });
+      
+      // Atualizar lista de nomes
+      setParticipants(participants.filter((p) => p.id !== user.uid));
 
-    const filtered = participants.filter((p) => p.id !== user.uid);
-    setParticipants(filtered);
-
-    setWorkout({
-      ...workout,
-      participants: workout.participants.filter((p) => p !== user.uid),
-    });
+    } catch (error) {
+      console.error("Erro ao sair do treino:", error);
+      alert("Erro ao sair do treino. Tente novamente.");
+    }
   };
 
-  if (!workout) return <p className={styles.empty}>Carregando...</p>;
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '50vh',
+          color: '#fff'
+        }}>
+          Carregando...
+        </div>
+      </div>
+    );
+  }
+
+  if (!workout) {
+    return (
+      <div className={styles.container}>
+        <span
+          className={styles.backLink}
+          style={{ color: "#fff" }}
+          onClick={() => router.push("/home")}
+        >
+          ← Voltar
+        </span>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '50vh',
+          color: '#fff'
+        }}>
+          Treino não encontrado
+        </div>
+      </div>
+    );
+  }
+
+  const isParticipant = user && Array.isArray(workout.participants) && workout.participants.includes(user.uid);
 
   return (
     <div className={styles.container}>
@@ -254,31 +387,39 @@ export default function WorkoutPage() {
         )}
       </div>
 
-      {/* Mostra rota detalhada visual com só inicio e fim */}
+      {/* Mapa com rota detalhada */}
       {workout.route && workout.route.length > 0 && (
         <DetailedRouteMap route={workout.route} />
       )}
 
-      {user &&
-      Array.isArray(workout.participants) &&
-      workout.participants.includes(user.uid) ? (
-        <button
-          className={`${styles.button} ${styles.leave}`}
-          onClick={leaveWorkout}
-        >
-          Sair do treino
-        </button>
+      {/* Botão Participar/Sair */}
+      {user ? (
+        isParticipant ? (
+          <button
+            className={`${styles.button} ${styles.leave}`}
+            onClick={leaveWorkout}
+          >
+            Sair do treino
+          </button>
+        ) : (
+          <button
+            className={`${styles.button} ${styles.join}`}
+            onClick={joinWorkout}
+          >
+            Participar
+          </button>
+        )
       ) : (
         <button
-          className={`${styles.button} ${styles.join}`}
-          onClick={joinWorkout}
+          className={`${styles.button} ${styles.disabled}`}
+          disabled
         >
-          Participar
+          Faça login para participar
         </button>
       )}
 
       <h2 className={styles.title} style={{ color: "#fff", marginTop: 40 }}>
-        Participantes
+        Participantes ({participants.length})
       </h2>
 
       {participants.length === 0 ? (
@@ -287,12 +428,13 @@ export default function WorkoutPage() {
         <ul className={styles.list}>
           {participants.map((p) => (
             <li key={p.id} className={styles.listItem}>
-              {p.name}
+              {p.name} {p.id === workout.creatorId && " (Criador)"}
             </li>
           ))}
         </ul>
       )}
 
+      {/* Modal de limite */}
       {showLimitModal && (
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>
