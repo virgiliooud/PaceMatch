@@ -69,24 +69,8 @@ export default function Assinatura() {
           >
             {loading ? "Carregando..." : "Assinar Agora"}
           </button>
-        </div>
-        {/* Caixa de Checkout Teste */}
-        <div className={`${styles.card} ${styles.teste}`}>
-          <h2 className={styles.cardTitulo}>Teste Stripe</h2>
-          <p className={styles.price}>R$ 0,10 (para testar)</p>
-          <ul className={styles.features}>
-            <li>Compra de teste integrando o Stripe</li>
-            <li>Ideal para conferir o funcionamento</li>
-          </ul>
-          <button
-            className={styles.subscribeButton}
-            onClick={handleSubscribeTest}
-            disabled={loadingTest}
-          >
-            {loadingTest ? "Carregando..." : "Testar Checkout"}
-          </button>
-        </div>
       </div>
+    </div>
     </div>
   );
 }
