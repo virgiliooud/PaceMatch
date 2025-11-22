@@ -78,6 +78,7 @@ export default function CreateWorkout() {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [routeMethod, setRouteMethod] = useState("map");
   const [customDistance, setCustomDistance] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const router = useRouter();
 
@@ -87,12 +88,17 @@ export default function CreateWorkout() {
   }, []);
 
   useEffect(() => {
+    if (isSubmitting) {
+      setHasUnsavedChanges(false);
+      return;
+    }
+
     if (name || type || paceMin || paceMax || location || date || time || route.length > 0 || customDistance) {
       setHasUnsavedChanges(true);
     } else {
       setHasUnsavedChanges(false);
     }
-  }, [name, type, paceMin, paceMax, location, date, time, route, customDistance]);
+  }, [name, type, paceMin, paceMax, location, date, time, route, customDistance, isSubmitting]);
 
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -157,13 +163,35 @@ export default function CreateWorkout() {
     }
   };
 
+  // ✅ NOVA FUNÇÃO: Remove um ponto específico da rota
+  const handleRemovePoint = (indexToRemove) => {
+    const newRoute = route.filter((_, index) => index !== indexToRemove);
+    setRoute(newRoute);
+    
+    // Se estiver no modo distância e remover o único ponto, limpa tudo
+    if (routeMethod === "distance" && newRoute.length === 0) {
+      setRoute([]);
+    }
+  };
+
+  // ✅ NOVA FUNÇÃO: Limpa toda a rota
+  const handleClearRoute = () => {
+    setRoute([]);
+    setDistance(0);
+    if (routeMethod === "distance") {
+      setCustomDistance("");
+    }
+  };
+
   async function handleSubmit(e) {
     e.preventDefault();
     
     console.log("🚀 INICIANDO CRIAÇÃO DE TREINO...");
+    setIsSubmitting(true);
     
     if (!user) {
       alert("❌ Você precisa estar logado!");
+      setIsSubmitting(false);
       return;
     }
 
@@ -171,26 +199,31 @@ export default function CreateWorkout() {
 
     if (isPrivate && password.trim().length < 4) {
       alert("Para criar um treino privado, informe uma senha com pelo menos 4 caracteres.");
+      setIsSubmitting(false);
       return;
     }
 
     if (!paceMin || !paceMax) {
       alert("Selecione o intervalo de pace!");
+      setIsSubmitting(false);
       return;
     }
 
     if (routeMethod === "map" && route.length < 2) {
       alert("Crie uma rota com pelo menos 2 pontos no mapa!");
+      setIsSubmitting(false);
       return;
     }
 
     if (routeMethod === "distance" && (!customDistance || parseFloat(customDistance) <= 0)) {
       alert("Informe uma distância válida!");
+      setIsSubmitting(false);
       return;
     }
 
     if (routeMethod === "distance" && route.length === 0) {
       alert("Marque o ponto de início no mapa!");
+      setIsSubmitting(false);
       return;
     }
 
@@ -232,6 +265,7 @@ export default function CreateWorkout() {
 
       if (totalUnico >= 3) {
         setShowLimitModal(true);
+        setIsSubmitting(false);
         return;
       }
     }
@@ -253,6 +287,7 @@ export default function CreateWorkout() {
 
     if (!name || !type || !location || !date || !time) {
       alert("Preencha todos os campos!");
+      setIsSubmitting(false);
       return;
     }
 
@@ -292,6 +327,7 @@ export default function CreateWorkout() {
         console.log("✅ CONFIRMADO: Treino salvo no Firebase:", savedDoc.data());
         alert("🎉 Treino criado com sucesso!");
         setHasUnsavedChanges(false);
+        setIsSubmitting(false);
         router.push("/home");
       } else {
         throw new Error("Treino não foi salvo no Firebase");
@@ -304,6 +340,7 @@ export default function CreateWorkout() {
       console.error("Stack:", error.stack);
       
       alert(`Erro ao criar treino: ${error.message}`);
+      setIsSubmitting(false);
     }
   }
 
@@ -495,6 +532,18 @@ export default function CreateWorkout() {
                   <span>📏 Distância:</span>
                   <strong>{distance.toFixed(2)} km</strong>
                 </div>
+                
+                {/* ✅ BOTÃO PARA LIMPAR ROTA - FORA DO FORM SUBMIT */}
+                {route.length > 0 && (
+                  <button
+                    type="button"
+                    className={styles.clearRouteButton}
+                    onClick={handleClearRoute}
+                  >
+                    🗑️ Limpar Rota
+                  </button>
+                )}
+                
                 <div className={styles.instructions}>
                   💡 Clique no mapa para ADICIONAR pontos • Clique nos pontos para REMOVER
                 </div>
@@ -509,6 +558,18 @@ export default function CreateWorkout() {
                   <span>📏 Distância:</span>
                   <strong>{customDistance || "0"} km</strong>
                 </div>
+                
+                {/* ✅ BOTÃO PARA REMOVER PONTO DE INÍCIO - FORA DO FORM SUBMIT */}
+                {route.length > 0 && (
+                  <button
+                    type="button"
+                    className={styles.clearRouteButton}
+                    onClick={handleClearRoute}
+                  >
+                    🗑️ Remover Ponto de Início
+                  </button>
+                )}
+                
                 <div className={styles.instructions}>
                   💡 Clique no mapa para DEFINIR o ponto de início
                 </div>
@@ -553,13 +614,20 @@ export default function CreateWorkout() {
                 : true
           }
         >
-          {routeMethod === "map" && route.length < 2
-            ? "Adicione pelo menos 2 pontos no mapa"
-            : routeMethod === "distance" && (!customDistance || parseFloat(customDistance) <= 0)
-            ? "Informe uma distância válida"
-            : routeMethod === "distance" && route.length === 0
-            ? "Marque o ponto de início no mapa"
-            : "Criar Treino"}
+          {isSubmitting ? (
+            <>
+              <div className={styles.spinner}></div>
+              Salvando...
+            </>
+          ) : routeMethod === "map" && route.length < 2 ? (
+            "Adicione pelo menos 2 pontos no mapa"
+          ) : routeMethod === "distance" && (!customDistance || parseFloat(customDistance) <= 0) ? (
+            "Informe uma distância válida"
+          ) : routeMethod === "distance" && route.length === 0 ? (
+            "Marque o ponto de início no mapa"
+          ) : (
+            "Criar Treino"
+          )}
         </button>
       </form>
 
