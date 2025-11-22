@@ -91,14 +91,6 @@
   font-size: 14px;
 }
 
-.paceInfo {
-  background: rgba(0, 198, 255, 0.1);
-  padding: 10px;
-  border-radius: 8px;
-  border-left: 4px solid #00c6ff;
-  font-size: 14px;
-}
-
 .routeMethod {
   display: flex;
   flex-direction: column;
@@ -155,6 +147,23 @@
   margin-bottom: 0;
 }
 
+.clearRouteButton {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  margin: 10px 0;
+  transition: background 0.3s;
+  width: 100%;
+}
+
+.clearRouteButton:hover {
+  background: #cc0000;
+}
+
 .instructions {
   margin-top: 15px;
   padding: 10px;
@@ -176,6 +185,10 @@
   cursor: pointer;
   transition: all 0.3s ease;
   margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .submitButton:hover:not(:disabled) {
@@ -189,6 +202,20 @@
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .modalOverlay {
@@ -298,36 +325,4 @@
   .backButton {
     align-self: flex-start;
   }
-}
-
-.clearRouteButton {
-  background: #ff4444;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  margin: 10px 0;
-  transition: background 0.3s;
-}
-
-.clearRouteButton:hover {
-  background: #cc0000;
-}
-
-.spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid transparent;
-  border-top: 2px solid currentColor;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-right: 8px;
-  display: inline-block;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }

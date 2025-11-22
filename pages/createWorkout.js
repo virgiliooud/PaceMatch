@@ -163,18 +163,6 @@ export default function CreateWorkout() {
     }
   };
 
-  // ✅ NOVA FUNÇÃO: Remove um ponto específico da rota
-  const handleRemovePoint = (indexToRemove) => {
-    const newRoute = route.filter((_, index) => index !== indexToRemove);
-    setRoute(newRoute);
-    
-    // Se estiver no modo distância e remover o único ponto, limpa tudo
-    if (routeMethod === "distance" && newRoute.length === 0) {
-      setRoute([]);
-    }
-  };
-
-  // ✅ NOVA FUNÇÃO: Limpa toda a rota
   const handleClearRoute = () => {
     setRoute([]);
     setDistance(0);
@@ -270,7 +258,6 @@ export default function CreateWorkout() {
       }
     }
 
-    // ✅ Serializar os pontos da rota
     const serializedRoute = route.map(point => ({
       lat: Number(point.lat),
       lng: Number(point.lng)
@@ -279,7 +266,6 @@ export default function CreateWorkout() {
     const pointsToSave = routeMethod === "map" ? serializedRoute : [serializedRoute[0]];
     const finalDistance = routeMethod === "map" ? distance : parseFloat(customDistance);
 
-    // ✅ Serializar o startPoint
     const serializedStartPoint = route.length > 0 ? {
       lat: Number(route[0].lat),
       lng: Number(route[0].lng)
@@ -292,7 +278,6 @@ export default function CreateWorkout() {
     }
 
     try {
-      // ✅ Dados serializados CORRETAMENTE
       const workoutData = {
         name: name.trim(),
         type: type.trim(),
@@ -316,12 +301,10 @@ export default function CreateWorkout() {
       console.log("📤 ENVIANDO PARA FIREBASE:");
       console.log(JSON.stringify(workoutData, null, 2));
 
-      // ✅ Tenta salvar no Firebase
       const docRef = await addDoc(collection(db, "workouts"), workoutData);
       
       console.log("✅ TREINO CRIADO COM SUCESSO! ID:", docRef.id);
       
-      // ✅ Verifica se realmente foi salvo
       const savedDoc = await getDoc(docRef);
       if (savedDoc.exists()) {
         console.log("✅ CONFIRMADO: Treino salvo no Firebase:", savedDoc.data());
@@ -424,13 +407,6 @@ export default function CreateWorkout() {
               ))}
             </select>
           </div>
-          {paceMin && paceMax && (
-            <div className={styles.paceInfo}>
-              Intervalo selecionado: <strong>{paceMin} - {paceMax}</strong>
-              <br />
-              <small>Treinos com pace entre {paceMin} e {paceMax} serão encontrados</small>
-            </div>
-          )}
         </div>
 
         <div className={styles.inputGroup}>
@@ -518,6 +494,7 @@ export default function CreateWorkout() {
               route={route}
               onRouteChange={handleMapClick}
               singlePoint={routeMethod === "distance"}
+              showRemoveButtons={false}
             />
           </div>
           
@@ -533,7 +510,6 @@ export default function CreateWorkout() {
                   <strong>{distance.toFixed(2)} km</strong>
                 </div>
                 
-                {/* ✅ BOTÃO PARA LIMPAR ROTA - FORA DO FORM SUBMIT */}
                 {route.length > 0 && (
                   <button
                     type="button"
@@ -559,7 +535,6 @@ export default function CreateWorkout() {
                   <strong>{customDistance || "0"} km</strong>
                 </div>
                 
-                {/* ✅ BOTÃO PARA REMOVER PONTO DE INÍCIO - FORA DO FORM SUBMIT */}
                 {route.length > 0 && (
                   <button
                     type="button"
